@@ -9,6 +9,7 @@ This tool is not intended for hacking!
 ## Features
   - Retrieve the **DataModel** and **VisualEngine** from a roblox process
   - Explore almost all the untouched assets of a specific game
+  - Partially recover content from **LocalScripts** and **ModuleScripts**
   - Search for assets using *name*, *type* and *memory address*
 
 ---
