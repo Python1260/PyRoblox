@@ -48,10 +48,14 @@ class Memory():
         self.offsets.setdefault("ClassDescriptorToEventDescriptor", "0xa68")
         self.offsets.setdefault("ClassDescriptorToBoundFunction", "0xb10")
     
-    def load_offsets(self):
-        path = os.path.join(self.app.path, 'offsets.json')
+    def load_offsets(self, offsetsfile=None):
+        path = None
 
-        self.download_offsets(path)
+        if offsetsfile != None:
+            path = offsetsfile
+        else:
+            path = os.path.join(self.app.path, 'offsets.json')
+            self.download_offsets(path)
 
         with open(path, 'r') as file:
             self.offsets = json.load(file)
@@ -65,6 +69,16 @@ class Memory():
         for proc in psutil.process_iter(['pid', 'name']):
             if proc.info['name'] == name:
                 return proc.info['pid']
+
+        return None
+    
+    def process_find_path(self, name=None):
+        if name is None:
+            name = self.target
+        
+        for proc in psutil.process_iter(['name', 'exe']):
+            if proc.info['name'] == name:
+                return proc.info['exe']
 
         return None
 

@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QScrollArea, QSizePolicy, QLineEdit
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QScrollArea, QSizePolicy, QLineEdit, QFileDialog
 from PyQt5.QtCore import QTimer, Qt, QRect, pyqtSignal, QThread
 from PyQt5.QtGui import QFont, QPainter, QColor, QPen
 import sip
@@ -30,7 +30,7 @@ BASE_VARIABLES = {
     "DataModel": {
         "GameId": "get_gameid",
         "PlaceId": "get_placeid",
-        "GameLoaded": "get_gameloaded",
+        "GameLoaded": "get_gameloaded"
     },
     "Workspace": {
         "Gravity": "get_gravity",

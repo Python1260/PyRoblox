@@ -75,8 +75,11 @@ class Application(QWidget):
     def __init__(self):
         super().__init__()
 
+        self.name = "Pyrblx"
+        self.version = 1.1
+
         self.running = False
-        self.enabled = True
+        self.enabled = False
         self.initialized = False
         self.timer = 0
         self.fps = 60
@@ -100,13 +103,15 @@ class Application(QWidget):
 
         self.overlay = Overlay(self)
         self.memory = Memory(self)
+
+        self.handle_offsets()
     
     def init_path(self):
         self.path = os.path.join(APP_DATA, "PYRBLX")
         os.makedirs(self.path, exist_ok=True)
     
     def init_ui(self):
-        self.setWindowTitle("Pyrblx")
+        self.setWindowTitle(f"{self.name} v{self.version}")
         self.setGeometry(100, 100, 800, 400)
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.Tool)
 
@@ -141,11 +146,16 @@ class Application(QWidget):
         mainlayout.setSpacing(8)
         mainlayout.setContentsMargins(15, 15, 15, 15)
         
-        title = QLabel("Pyrblx v1.1")
+        title = QLabel(f"{self.name} v{self.version}")
         title.setFont(QFont("Segoe UI", 16, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("color: #ffffff; font-weight: 600; margin-bottom: 10px;")
         mainlayout.addWidget(title)
+
+        self.warning = QLabel("---")
+        self.warning.setAlignment(Qt.AlignCenter)
+        self.warning.setStyleSheet("color: #b0b0b0;")
+        mainlayout.addWidget(self.warning)
 
         middlelayout = QHBoxLayout()
         middlelayout.setSpacing(10)
@@ -153,9 +163,9 @@ class Application(QWidget):
         leftlayout = QVBoxLayout()
         leftlayout.setSpacing(8)
         
-        self.status = QLabel("Status:               Connecting...")
+        self.status = QLabel("Status:               Waiting...")
         self.status.setFixedWidth(400 - 15)
-        self.status.setStyleSheet("color: #ffa500; background-color: #2d2d2d; border-radius: 5px;")
+        self.status.setStyleSheet("background-color: #2d2d2d; border-radius: 5px;")
         leftlayout.addWidget(self.status)
 
         self.dmlabel = QLabel("DataModel:        0x0")
@@ -209,23 +219,15 @@ class Application(QWidget):
         middlelayout.addLayout(rightLayout)
 
         mainlayout.addLayout(middlelayout)
+
+        self.filechoose = QPushButton("Choose offset file")
+
+        self.filechoose.clicked.connect(self.choose_offsets)
+        mainlayout.addWidget(self.filechoose)
         
-        self.exitbtn = QPushButton("Exit")
-        self.exitbtn.clicked.connect(self.closeEvent)
-        self.exitbtn.setStyleSheet("""
-            QPushButton {
-                background-color: #d13438;
-                border: 1px solid #b12a2e;
-                color: white;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background-color: #e14448;
-            }
-            QPushButton:pressed {
-                background-color: #c12428;
-            }
-        """)
+        self.exitbtn = QPushButton("Start")
+        self.exitbtn.clicked.connect(self.enable)
+        self.exitbtn.setStyleSheet("background-color: #34d141; border: 1px solid #63ff70; color: white; font-weight: 600;")
         mainlayout.addWidget(self.exitbtn)
 
         self.setLayout(mainlayout)
@@ -289,6 +291,51 @@ class Application(QWidget):
         
         sys.exit()
     
+    def choose_offsets(self):
+        file, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select a file",
+            "",
+            "JSON Files (*.json)"
+        )
+
+        if file:
+            try:
+                self.memory.load_offsets(file)
+                self.handle_offsets()
+                self.filechoose.setText(f"Offset file: {os.path.basename(file)}")
+            except Exception as e:
+                self.filechoose.setText("Please choose a valid .json file!")
+    
+    def handle_offsets(self):
+        if self.memory.process_find() == None: return
+
+        if "RobloxVersion" in self.memory.offsets:
+            version = os.path.basename(os.path.dirname(self.memory.process_find_path()))
+
+            if not version in self.memory.offsets["RobloxVersion"]:
+                self.warning.setText("WARNING: OFFSET AND ROBLOX VERSIONS DO NOT MATCH!")
+                self.warning.setStyleSheet("color: #b74b4b;")
+            else:
+                self.warning.setText("You are up to date!")
+                self.warning.setStyleSheet("color: #b0b0b0;")
+        else:
+            self.warning.setText("WARNING: OFFSET VERSION NOT FOUND!")
+            self.warning.setStyleSheet("color: #b74b4b;")
+    
+    def enable(self):
+        self.enabled = True
+
+        self.exitbtn.setText("Exit")
+        self.exitbtn.setStyleSheet("background-color: #d13438; border: 1px solid #b12a2e; color: white; font-weight: 600;")
+        self.exitbtn.clicked.disconnect()
+        self.exitbtn.clicked.connect(self.closeEvent)
+
+        self.status.setText("Status:               Connecting...")
+        self.status.setStyleSheet("color: #ffa500; background-color: #2d2d2d; border-radius: 5px;")
+
+        self.filechoose.clicked.disconnect()
+    
     def run(self):
         self.init_timer()
         self.show()
@@ -303,6 +350,8 @@ class Application(QWidget):
             return False
     
     def update(self):
+        if not self.enabled: return
+
         if not self.memory.process_is_open():
             self.retry += 1
 
@@ -319,14 +368,14 @@ class Application(QWidget):
                     self.status.setText("Status:               Connection failed")
                     self.status.setStyleSheet("color: #ff4444; background-color: #2d2d2d; border-radius: 5px;")
             return
-
+        
         self.datamodel = self.memory.get_datamodel()
         self.visualengine = self.memory.get_visualengine()
 
-        self.dmlabel.setText(f"DataModel:        0x{self.datamodel.address:X}")
-        self.velabel.setText(f"VisualEngine:     0x{self.visualengine.address:X}")
+        self.dmlabel.setText(f"DataModel:        0x{self.datamodel.address:X}    {"" if self.datamodel else "(NOT FOUND)"}")
+        self.velabel.setText(f"VisualEngine:     0x{self.visualengine.address:X}    {"" if self.visualengine else "(NOT FOUND)"}")
 
-        if self.enabled and (self.datamodel.address and self.visualengine.address):
+        if self.datamodel :
             if not self.initialized:
                 self.onInit()
                 self.initialized = True
