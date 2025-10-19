@@ -56,12 +56,14 @@ class Overlay(QWidget):
             painter.drawEllipse(round(coords[0] - radius), round(coords[1] - radius), radius * 2, radius * 2)
     
     def setDot(self, owner, dot):
-        if len(self.dots) == 1 and next(iter(self.dots.items()))[0] == owner:
+        prevowner = next(iter(self.dots.items()))[0] if len(self.dots) == 1 else None
+
+        if len(self.dots) == 1 and prevowner == owner:
             self.dots = {}
-            return False
+            return None, prevowner
         else:
             self.dots = { owner: dot }
-            return True
+            return owner, prevowner
     
     def addDot(self, owner, dot):
         if owner in self.dots:
@@ -112,7 +114,7 @@ class Application(QWidget):
     
     def init_ui(self):
         self.setWindowTitle(f"{self.name} v{self.version}")
-        self.setGeometry(100, 100, 800, 400)
+        self.setGeometry(100, 100, 800, 600)
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.Tool)
 
         self.setStyleSheet("""

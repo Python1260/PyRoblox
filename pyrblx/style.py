@@ -12,19 +12,26 @@ def displayPosition(app, obj):
         pos_adv = app.visualengine.world_to_screen(cframe_adv.position)
 
         return (pos.x, pos.y, pos_adv.x, pos_adv.y)
-    
-    status = app.overlay.setDot(obj.address, getCFrame)
 
     if obj in app.instance_buttons:
         childbutton = app.instance_buttons[obj]
 
         if not sip.isdeleted(childbutton):
-            childbuttonlayout = childbutton.layout()
-            childinfo = childbuttonlayout.itemAt(0).widget()
-            childinfolayout = childinfo.layout()
-            childname = childinfolayout.itemAt(childinfolayout.count() - 1).widget()
+            selected, unselected = app.overlay.setDot(childbutton, getCFrame)
 
-            childname.setStyleSheet(f"color: {"#0000ff" if status else "#b0b0b0"}; background-color: #2d2d2d; border-radius: 3px; padding: 5px; text-align: left;")
+            if selected in app.instance_buttons_rev:
+                selectedbuttonlayout = selected.layout()
+                selectedinfo = selectedbuttonlayout.itemAt(0).widget()
+                selectedinfolayout = selectedinfo.layout()
+                selectedname = selectedinfolayout.itemAt(selectedinfolayout.count() - 1).widget()
+                selectedname.setStyleSheet(f"color: {"#0000ff"}; background-color: #2d2d2d; border-radius: 3px; padding: 5px; text-align: left;")
+
+            if unselected in app.instance_buttons_rev:
+                unselectedbuttonlayout = unselected.layout()
+                unselectedinfo = unselectedbuttonlayout.itemAt(0).widget()
+                unselectedinfolayout = unselectedinfo.layout()
+                unselectedname = unselectedinfolayout.itemAt(unselectedinfolayout.count() - 1).widget()
+                unselectedname.setStyleSheet(f"color: {"#b0b0b0"}; background-color: #2d2d2d; border-radius: 3px; padding: 5px; text-align: left;")
 
 BASE_VARIABLES = {
     "DataModel": {
