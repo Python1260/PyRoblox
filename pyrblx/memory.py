@@ -301,6 +301,28 @@ class Memory():
             return True
         except Exception as e:
             return False
+    
+    def readboolmask(self, address, mask):
+        try:
+            byte = self.readbytes(address, 1)
+            return (byte & mask) != 0
+        except Exception as e:
+            return False
+    
+    def writeboolmask(self, address, mask, value):
+        self.protect(address, 1)
+        
+        try:
+            byte = self.readbytes(address, 1)
+
+            if value:
+                byte |= mask
+            else:
+                byte &= ~mask
+
+            return self.writebytes(address, byte)
+        except Exception as e:
+            return False
 
     def readbytes(self, address, size):
         try:

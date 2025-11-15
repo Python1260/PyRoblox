@@ -35,6 +35,7 @@ def displayPosition(app, obj):
 
 BASE_VARIABLES = {
     "DataModel": {
+        "CreatorId": "get_creatorid",
         "GameId": "get_gameid",
         "PlaceId": "get_placeid",
         "GameLoaded": "get_gameloaded"
@@ -67,7 +68,8 @@ BASE_VARIABLES = {
         "Size": "get_size",
         "CFrame": "get_cframe",
         "Anchored": "get_anchored",
-        "CanCollide": "get_cancollide"
+        "CanCollide": "get_cancollide",
+        "CanTouch": "get_cantouch"
     },
     "Part": {
         "Position": "get_position",
@@ -75,7 +77,8 @@ BASE_VARIABLES = {
         "Size": "get_size",
         "CFrame": "get_cframe",
         "Anchored": "get_anchored",
-        "CanCollide": "get_cancollide"
+        "CanCollide": "get_cancollide",
+        "CanTouch": "get_cantouch"
     },
     "MeshPart": {
         "Position": "get_position",
@@ -83,7 +86,8 @@ BASE_VARIABLES = {
         "Size": "get_size",
         "CFrame": "get_cframe",
         "Anchored": "get_anchored",
-        "CanCollide": "get_cancollide"
+        "CanCollide": "get_cancollide",
+        "CanTouch": "get_cantouch"
     },
     "IntValue": {
         "Value": "get_value"

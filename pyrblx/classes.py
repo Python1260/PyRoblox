@@ -347,6 +347,13 @@ class DataModel(Instance):
     def get_service(self, service):
         return self.find_first_child(service)
     
+    def get_creatorid(self):
+        try:
+            offset = self.memory.get_offset("CreatorId")
+            return self.memory.readnumber(self.address + offset)
+        except Exception as e:
+            return 0
+    
     def get_gameid(self):
         try:
             offset = self.memory.get_offset("GameId")
@@ -718,9 +725,9 @@ class BasePart(Instance):
     def get_anchored(self):
         try:
             offset = self.memory.get_offset("Anchored")
-            value = self.memory.readbool(self.address + offset)
+            mask = self.memory.get_offset("AnchoredMask")
 
-            return value
+            return self.memory.readboolmask(self.get_primitive() + offset, mask)
         except Exception as e:
             return False
     
@@ -729,29 +736,49 @@ class BasePart(Instance):
             return False
         try:
             offset = self.memory.get_offset("Anchored")
-            self.memory.writebool(self.address + offset, value)
+            mask = self.memory.get_offset("AnchoredMask")
 
-            return True
+            return self.memory.writeboolmask(self.get_primitive() + offset, mask, value)
         except Exception as e:
             return False
     
     def get_cancollide(self):
         try:
             offset = self.memory.get_offset("CanCollide")
-            value = self.memory.readbool(self.address + offset)
+            mask = self.memory.get_offset("CanCollideMask")
 
-            return value
+            return self.memory.readboolmask(self.get_primitive() + offset, mask)
         except Exception as e:
             return False
-
+    
     def set_cancollide(self, value):
         if not self.memory or not self.address:
             return False
         try:
             offset = self.memory.get_offset("CanCollide")
-            self.memory.writebool(self.address + offset, value)
+            mask = self.memory.get_offset("CanCollideMask")
 
-            return True
+            return self.memory.writeboolmask(self.get_primitive() + offset, mask, value)
+        except Exception as e:
+            return False
+
+    def get_cantouch(self):
+        try:
+            offset = self.memory.get_offset("CanTouch")
+            mask = self.memory.get_offset("CanTouchMask")
+
+            return self.memory.readboolmask(self.get_primitive() + offset, mask)
+        except Exception as e:
+            return False
+    
+    def set_cantouch(self, value):
+        if not self.memory or not self.address:
+            return False
+        try:
+            offset = self.memory.get_offset("CanTouch")
+            mask = self.memory.get_offset("CanTouchMask")
+
+            return self.memory.writeboolmask(self.get_primitive() + offset, mask, value)
         except Exception as e:
             return False
 
