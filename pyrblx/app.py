@@ -12,11 +12,24 @@ from style import *
 
 APP_DATA = os.getenv("LOCALAPPDATA")
 
+def clearLayout(layout):
+    while layout.count():
+        item = layout.takeAt(0)
+        widget = item.widget()
+        if widget is not None:
+            widget.deleteLater()
+        else:
+            sub_layout = item.layout()
+            if sub_layout is not None:
+                clearLayout(sub_layout)
+
 class Overlay(QWidget):
     def __init__(self, app):
         super().__init__()
 
         self.app = app
+
+        self.maintimer = None
 
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.CustomizeWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -79,6 +92,8 @@ class Application(QWidget):
 
         self.name = "Pyrblx"
         self.version = 1.1
+
+        self.maintimer = None
 
         self.running = False
         self.enabled = False
@@ -222,7 +237,7 @@ class Application(QWidget):
 
         mainlayout.addLayout(middlelayout)
 
-        self.filechoose = QPushButton("Choose offset file")
+        self.filechoose = QPushButton("Choose offset file (JSON)")
 
         self.filechoose.clicked.connect(self.choose_offsets)
         mainlayout.addWidget(self.filechoose)
@@ -285,6 +300,9 @@ class Application(QWidget):
             self.overlay.maintimer.stop()
             self.overlay.close()
         
+        if self.memory:
+            self.memory.free()
+        
         self.maintimer.stop()
         QApplication.quit()
 
@@ -328,15 +346,58 @@ class Application(QWidget):
     def enable(self):
         self.enabled = True
 
-        self.exitbtn.setText("Exit")
+        self.exitbtn.setText("Stop")
         self.exitbtn.setStyleSheet("background-color: #d13438; border: 1px solid #b12a2e; color: white; font-weight: 600;")
         self.exitbtn.clicked.disconnect()
-        self.exitbtn.clicked.connect(self.closeEvent)
+        self.exitbtn.clicked.connect(self.disable)
 
         self.status.setText("Status:               Connecting...")
         self.status.setStyleSheet("color: #ffa500; background-color: #2d2d2d; border-radius: 5px;")
 
-        self.filechoose.clicked.disconnect()
+        self.filechoose.setDisabled(True)
+    
+    def disable(self):
+        self.enabled = False
+
+        self.initialized = False
+
+        self.attempts = 0
+        self.retry = 0
+
+        self.datamodel = None
+        self.visualengine = None
+
+        if self.overlay:
+            if self.overlay.maintimer: self.overlay.maintimer.stop()
+            self.overlay.close()
+        self.overlay = Overlay(self)
+        self.overlay.run()
+
+        if self.memory:
+            self.memory.free()
+        self.memory = Memory(self)
+
+        try:
+            self.searchbox.textChanged.disconnect()
+            self.searchbox.returnPressed.disconnect()
+        except Exception:
+            pass
+
+        self.exitbtn.setText("Start")
+        self.exitbtn.clicked.disconnect()
+        self.exitbtn.clicked.connect(self.enable)
+        self.exitbtn.setStyleSheet("background-color: #34d141; border: 1px solid #63ff70; color: white; font-weight: 600;")
+
+        self.status.setText("Status:               Waiting...")
+        self.status.setStyleSheet("color: #ffffff; background-color: #2d2d2d; border-radius: 5px;")
+
+        self.dmlabel.setText("DataModel:        0x0")
+        self.velabel.setText("VisualEngine:     0x0")
+
+        clearLayout(self.vrframe)
+        clearLayout(self.dtframe)
+
+        self.filechoose.setDisabled(False)
     
     def run(self):
         self.init_timer()
@@ -377,12 +438,15 @@ class Application(QWidget):
         self.dmlabel.setText(f"DataModel:        0x{self.datamodel.address:X}    {"" if self.datamodel else "(NOT FOUND)"}")
         self.velabel.setText(f"VisualEngine:     0x{self.visualengine.address:X}    {"" if self.visualengine else "(NOT FOUND)"}")
 
-        if self.datamodel :
-            if not self.initialized:
-                self.onInit()
-                self.initialized = True
+        if self.datamodel and self.visualengine:
+            try:
+                if not self.initialized:
+                    self.initialized = True
+                    self.onInit()
 
-            self.onStep()
+                self.onStep()
+            except Exception:
+                self.disable()
         
     def onInit(self):
         self.instance_buttons = {}
@@ -406,7 +470,6 @@ class Application(QWidget):
             main_layout.setSpacing(0)
 
             info_widget = QWidget()
-            info_widget.setFixedWidth(400)
             info_layout = QHBoxLayout(info_widget)
             info_layout.setContentsMargins(0, 0, 0, 0)
             info_layout.setSpacing(0)
@@ -594,17 +657,6 @@ class Application(QWidget):
                 QApplication.processEvents()
 
             return descendants
-
-        def clearLayout(layout):
-            while layout.count():
-                item = layout.takeAt(0)
-                widget = item.widget()
-                if widget is not None:
-                    widget.deleteLater()
-                else:
-                    sub_layout = item.layout()
-                    if sub_layout is not None:
-                        clearLayout(sub_layout)
         
         def testSearch(text, obj):
             stext = text.lower().split(" ")
@@ -670,8 +722,6 @@ class Application(QWidget):
 
         self.updateVariable = updateVariable
 
-        self.clearLayout = clearLayout
-
         self.searchbox.textChanged.connect(filterSearch)
         self.searchbox.returnPressed.connect(lambda : filterSearch(self.searchbox.text()))
 
@@ -692,7 +742,7 @@ class Application(QWidget):
 
         if self.selected_instance != None:
             if not self.selected_instance.get_parent():
-                self.clearLayout(self.vrframe)
+                clearLayout(self.vrframe)
                 self.selected_instance = None
                 self.selected_variables = {}
             else:
