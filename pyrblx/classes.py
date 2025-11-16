@@ -97,6 +97,9 @@ class Instance():
     def __str__(self):
         return f"{self.get_name()} ({self.get_class()} object at {hex(self.address)})"
     
+    def __getattr__(self, name):
+        return self.find_first_child(name)
+    
     @classmethod
     def new(cls, memory, address):
         if address == 0:
@@ -942,6 +945,8 @@ class Script(Instance):
 class LocalScript(Instance):
     def __init__(self, memory, address):
         super().__init__(memory, address)
+
+        self.worker = ScriptBytecode()
     
     def get_bytecode(self):
         try:
@@ -954,19 +959,47 @@ class LocalScript(Instance):
             return self.memory.readbytes(baddr, length)
         except Exception as e:
             return b""
+    
+    def set_bytecode(self, bytecode):
+        if not self.memory or not self.address:
+            return False
+        try:
+            offset = self.memory.get_offset("LocalScriptByteCode")
+            boffset = self.memory.get_offset("LocalScriptBytecodePointer")
+            addr = self.memory.readptr(self.address + offset)
+
+            baddr = self.memory.readptr(addr + boffset)
+            self.memory.free(baddr)
+
+            baddr = self.memory.allocate(len(bytecode))
+            self.memory.writebytes(baddr, bytecode)
+
+            self.memory.writeptr(addr + boffset, baddr)
+            self.memory.writeint(addr + boffset + 0x10, len(bytecode))
+            
+            return True
+        except Exception as e:
+            return False
 
     def get_content(self):
         bytecode = self.get_bytecode()
         if not bytecode:
             return b""
-
-        decoder = ScriptBytecode()
         
-        return decoder.decode(bytecode)
+        return self.worker.decode(bytecode)
+
+    def set_content(self, content):
+        bytecode = self.worker.encode(content)
+        if not bytecode:
+            return False
+
+        return self.set_bytecode(bytecode)
 
 class ModuleScript(Instance):
     def __init__(self, memory, address):
         super().__init__(memory, address)
+
+        self.worker = ScriptBytecode()
     
     def get_bytecode(self):
         try:
@@ -979,15 +1012,41 @@ class ModuleScript(Instance):
             return self.memory.readbytes(baddr, length)
         except Exception as e:
             return b""
+        
+    def set_bytecode(self, bytecode):
+        if not self.memory or not self.address:
+            return False
+        try:
+            offset = self.memory.get_offset("ModuleScriptByteCode")
+            boffset = self.memory.get_offset("ModuleScriptBytecodePointer")
+            addr = self.memory.readptr(self.address + offset)
+
+            baddr = self.memory.readptr(addr + boffset)
+            self.memory.free(baddr)
+
+            baddr = self.memory.allocate(len(bytecode))
+            self.memory.writebytes(baddr, bytecode)
+
+            self.memory.writeptr(addr + boffset, baddr)
+            self.memory.writeint(addr + boffset + 0x10, len(bytecode))
+            
+            return True
+        except Exception as e:
+            return False
 
     def get_content(self):
         bytecode = self.get_bytecode()
         if not bytecode:
             return b""
-
-        decoder = ScriptBytecode()
         
-        return decoder.decode(bytecode)
+        return self.worker.decode(bytecode)
+
+    def set_content(self, content):
+        bytecode = self.worker.encode(content)
+        if not bytecode:
+            return False
+
+        return self.set_bytecode(bytecode)
 
 class Sound(Instance):
     def __init__(self, memory, address):

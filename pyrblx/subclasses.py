@@ -115,6 +115,29 @@ class ScriptBytecode():
         self.k_magic = b"RSB1"
         self.k_mult = 41
         self.k_seed = 42
+    
+    def encode(self, raw: bytes):
+        cctx = zstd.ZstdCompressor()
+        compressed = cctx.compress(raw)
+
+        ss = bytearray(4 + 4 + len(compressed))
+        ss[0:4] = b"\x00\x00\x00\x00"
+        ss[4:8] = len(raw).to_bytes(4, "little")
+        ss[8:] = compressed
+
+        rehash = xxhash.xxh32(ss, seed=self.k_seed).intdigest()
+        hb = bytearray(rehash.to_bytes(4, "little"))
+
+        for i in range(len(ss)):
+            ss[i] ^= (hb[i % 4] + i * self.k_mult) & 0xFF
+
+        for i in range(4):
+            hb[i] = (hb[i] + i * self.k_mult) & 0xFF
+            hb[i] ^= self.k_magic[i]
+
+        ss[0:4] = hb
+
+        return bytes(ss)
 
     def decode(self, content):
         ss = bytearray(content)
@@ -134,7 +157,6 @@ class ScriptBytecode():
         rehash = xxhash.xxh32(ss, seed=self.k_seed).intdigest()
 
         if rehash != expected_hash:
-            print(f"Hash mismatch! expected {expected_hash:#x}, got {rehash:#x}")
             return b""
         
         decompressed_size = int.from_bytes(ss[4:8], "little", signed=False)
@@ -144,5 +166,4 @@ class ScriptBytecode():
             decompressed = dctx.decompress(ss[8:], max_output_size=decompressed_size)
             return decompressed
         except Exception as e:
-            print("Decompression failed:", e)
             return b""

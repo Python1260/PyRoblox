@@ -301,7 +301,7 @@ class Application(QWidget):
             self.overlay.close()
         
         if self.memory:
-            self.memory.free()
+            self.memory.close()
         
         self.maintimer.stop()
         QApplication.quit()
@@ -374,7 +374,7 @@ class Application(QWidget):
         self.overlay.run()
 
         if self.memory:
-            self.memory.free()
+            self.memory.close()
         self.memory = Memory(self)
 
         try:
@@ -632,6 +632,10 @@ class Application(QWidget):
 
             if isinstance(result, Instance):
                 button.clicked.connect(lambda : selectVariable(varvalue()))
+            elif isinstance(result, str):
+                button.clicked.connect(lambda : QApplication.clipboard().setText(varvalue()))
+            elif isinstance(result, bytes):
+                button.clicked.connect(lambda : QApplication.clipboard().setText(str(varvalue())))
 
             main_layout.addStretch()
             self.vrframe.addWidget(main_widget)

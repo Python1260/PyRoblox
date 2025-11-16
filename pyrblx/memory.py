@@ -131,6 +131,9 @@ class Memory():
 
         return addr
     
+    def free(self, address):
+        self.process.free(address)
+    
     def thread(self, start_address, timeout=5000):
         kernel32 = ctypes.windll.kernel32
 
@@ -459,7 +462,7 @@ class Memory():
         except Exception as e:
             return False
     
-    def free(self):
+    def close(self):
         if self.process:
             self.process.close_process()
             self.process = None
