@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QScrollArea, QSizePolicy, QLineEdit, QFileDialog
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QScrollArea, QSizePolicy, QLineEdit, QFileDialog, QTabWidget, QTextEdit
 from PyQt5.QtCore import QTimer, Qt, QRect, pyqtSignal, QThread
 from PyQt5.QtGui import QFont, QPainter, QColor, QPen
 import sip
@@ -49,13 +49,18 @@ BASE_VARIABLES = {
     },
     "Player": {
         "Character": "get_character",
-        "UserId": "get_userid"
+        "UserId": "get_userid",
+        "Team": "get_team",
+        "Mouse": "get_mouse"
     },
     "Humanoid": {
         "Health": "get_health",
         "MaxHealth": "get_maxhealth",
         "WalkSpeed": "get_walkspeed",
-        "JumpPower": "get_jumppower"
+        "JumpPower": "get_jumppower",
+        "MoveDirection": "get_movedirection"
+    },
+    "PlayerMouse": {
     },
     "Camera": {
         "Position": "get_position",
@@ -69,7 +74,8 @@ BASE_VARIABLES = {
         "CFrame": "get_cframe",
         "Anchored": "get_anchored",
         "CanCollide": "get_cancollide",
-        "CanTouch": "get_cantouch"
+        "CanTouch": "get_cantouch",
+        "Velocity": "get_velocity"
     },
     "Part": {
         "Position": "get_position",
@@ -78,7 +84,8 @@ BASE_VARIABLES = {
         "CFrame": "get_cframe",
         "Anchored": "get_anchored",
         "CanCollide": "get_cancollide",
-        "CanTouch": "get_cantouch"
+        "CanTouch": "get_cantouch",
+        "Velocity": "get_velocity"
     },
     "MeshPart": {
         "Position": "get_position",

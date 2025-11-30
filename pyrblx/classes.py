@@ -348,7 +348,7 @@ class DataModel(Instance):
         super().__init__(memory, address)
     
     def get_service(self, service):
-        return self.find_first_child(service)
+        return self.find_first_child_of_class(service)
     
     def get_creatorid(self):
         try:
@@ -448,6 +448,27 @@ class Player(Instance):
             return self.memory.readnumber(self.address + offset)
         except Exception as e:
             return 0
+    
+    def get_ping(self):
+        try:
+            offset = self.memory.get_offset("Ping")
+            return self.memory.readfloat(self.address + offset)
+        except Exception as e:
+            return 0.0
+        
+    def get_team(self):
+        try:
+            offset = self.memory.get_offset("Team")
+            return Instance.new(self.memory, self.memory.readptr(self.address + offset))
+        except Exception as e:
+            return Instance.new(self.memory, 0)
+    
+    def get_mouse(self):
+        try:
+            offset = self.memory.get_offset("PlayerMouse")
+            return Instance.new(self.memory, self.memory.readptr(self.address + offset))
+        except Exception as e:
+            return Instance.new(self.memory, 0)
 
 class Humanoid(Instance):
     def __init__(self, memory, address):
@@ -569,6 +590,33 @@ class Humanoid(Instance):
             return True
         except Exception as e:
             return False
+    
+    def get_movedirection(self):
+        try:
+            movoffset = self.memory.get_offset("MoveDirection")
+            x, y, z = self.memory.readfloats(self.address + movoffset, 3)
+
+            return Vector3(x, y, z)
+        except Exception as e:
+            pass
+
+        return Vector3()
+
+class PlayerMouse(Instance):
+    def __init__(self, memory, address):
+        super().__init__(memory, address)
+    
+    def get_position(self):
+        try:
+            offset = self.memory.get_offset("MousePosition")
+            x = self.memory.readint(self.address + offset)
+            y = self.memory.readint(self.address + offset + 0x4)
+
+            return Vector2(x, y)
+        except Exception as e:
+            pass
+
+        return Vector2()
 
 class Camera(Instance):
     def __init__(self, memory, address):
@@ -784,6 +832,20 @@ class BasePart(Instance):
             return self.memory.writeboolmask(self.get_primitive() + offset, mask, value)
         except Exception as e:
             return False
+    
+    def get_velocity(self):
+        try:
+            veloffset = self.memory.get_offset("Velocity")
+
+            prim = self.get_primitive()
+            if prim:
+                vx, vy, vz = self.memory.readfloats(prim + veloffset, 3)
+
+                return Vector3(vx, vy, vz)
+        except Exception as e:
+            pass
+
+        return Vector3()
 
     def get_bounds(self):
         minx = float('inf')
@@ -1065,6 +1127,7 @@ CLASSTYPES = {
     "Players": Players,
     "Player": Player,
     "Humanoid": Humanoid,
+    "PlayerMouse": PlayerMouse,
     "Camera": Camera,
     "BasePart": BasePart,
     "Part": BasePart,

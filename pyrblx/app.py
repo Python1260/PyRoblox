@@ -67,6 +67,8 @@ class Overlay(QWidget):
             painter.drawLine(round(coords[0]), round(coords[1]), round(coords[2]), round(coords[3]))
             painter.setPen(pen_blue)
             painter.drawEllipse(round(coords[0] - radius), round(coords[1] - radius), radius * 2, radius * 2)
+        
+        painter.end()
     
     def setDot(self, owner, dot):
         prevowner = next(iter(self.dots.items()))[0] if len(self.dots) == 1 else None
@@ -174,36 +176,57 @@ class Application(QWidget):
         self.warning.setStyleSheet("color: #b0b0b0;")
         mainlayout.addWidget(self.warning)
 
-        middlelayout = QHBoxLayout()
-        middlelayout.setSpacing(10)
+        tabslayout = QTabWidget()
+        tabslayout.setStyleSheet("""
+            QTabWidget::pane {
+                background: #222;
+            }
+
+            QTabBar::tab {
+                background: #444;
+                color: white;
+                padding: 8px 15px;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+            }
+                                 
+            QTabBar::tab:selected {
+                background: #666;
+            }
+                                 
+            QTabBar::tab:hover {
+                background: #555;
+            }
+        """)
 
         leftlayout = QVBoxLayout()
         leftlayout.setSpacing(8)
+        leftwidget = QWidget()
+        leftwidget.setLayout(leftlayout)
         
         self.status = QLabel("Status:               Waiting...")
-        self.status.setFixedWidth(400 - 15)
         self.status.setStyleSheet("background-color: #2d2d2d; border-radius: 5px;")
         leftlayout.addWidget(self.status)
 
         self.dmlabel = QLabel("DataModel:        0x0")
-        self.dmlabel.setFixedWidth(400 - 15)
         self.dmlabel.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-radius: 3px;")
         leftlayout.addWidget(self.dmlabel)
         
         self.velabel = QLabel("VisualEngine:     0x0")
-        self.velabel.setFixedWidth(400 - 15)
         self.velabel.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-radius: 3px;")
         leftlayout.addWidget(self.velabel)
 
-        middlelayout.addLayout(leftlayout)
+        tabslayout.addTab(leftwidget, "Main")
 
-        rightLayout = QVBoxLayout()
-        rightLayout.setSpacing(4)
+        rightlayout = QVBoxLayout()
+        rightlayout.setSpacing(4)
+        rightwidget = QWidget()
+        rightwidget.setLayout(rightlayout)
 
         self.searchbox = QLineEdit()
         self.searchbox.setPlaceholderText("Search for an instance here...")
         self.searchbox.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
-        rightLayout.addWidget(self.searchbox)
+        rightlayout.addWidget(self.searchbox)
 
         dtscroll = QScrollArea(self)
         dtscroll.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-radius: 0px;")
@@ -217,7 +240,7 @@ class Application(QWidget):
         self.dtframe.setSpacing(5)
 
         dtscroll.setWidget(dtwidget)
-        rightLayout.addWidget(dtscroll)
+        rightlayout.addWidget(dtscroll)
 
         vrscroll = QScrollArea(self)
         vrscroll.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-radius: 0px;")
@@ -231,11 +254,40 @@ class Application(QWidget):
         self.vrframe.setSpacing(5)
 
         vrscroll.setWidget(vrwidget)
-        rightLayout.addWidget(vrscroll)
+        rightlayout.addWidget(vrscroll)
 
-        middlelayout.addLayout(rightLayout)
+        tabslayout.addTab(rightwidget, "Instances")
 
-        mainlayout.addLayout(middlelayout)
+        toplayout = QVBoxLayout()
+        topwidget = QWidget()
+        topwidget.setLayout(toplayout)
+
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(4)
+
+        self.executebox = QLineEdit()
+        self.executebox.setPlaceholderText("Code to execute…")
+        self.executebox.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
+
+        self.executebutton = QPushButton("Run")
+        self.executebutton.setStyleSheet("color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px;")
+
+        row.addWidget(self.executebox)
+        row.addWidget(self.executebutton)
+
+        toplayout.addLayout(row)
+
+        self.executeresult = QTextEdit("> Pyrblx is running...")
+        self.executeresult.setReadOnly(True)
+        self.executeresult.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
+        self.executeresult.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        toplayout.addWidget(self.executeresult)
+
+        tabslayout.addTab(topwidget, "Execute")
+
+        mainlayout.addWidget(tabslayout)
 
         self.filechoose = QPushButton("Choose offset file (JSON)")
 
@@ -382,6 +434,15 @@ class Application(QWidget):
             self.searchbox.returnPressed.disconnect()
         except Exception:
             pass
+        try:
+            self.executebox.textChanged.disconnect()
+            self.executebox.returnPressed.disconnect()
+        except Exception:
+            pass
+        try:
+            self.executebutton.clicked.disconnect()
+        except Exception:
+            pass
 
         self.exitbtn.setText("Start")
         self.exitbtn.clicked.disconnect()
@@ -457,7 +518,8 @@ class Application(QWidget):
         self.base_variables = BASE_VARIABLES
         self.base_actions = BASE_ACTIONS
 
-        self.current_searches = []
+        self.searches_current = []
+        self.searches_closedbuttons = []
         
         def loadButton(obj, parent, strictchildren=None):
             objname = obj.get_name()
@@ -584,6 +646,10 @@ class Application(QWidget):
                 else:
                     button.hide()
                     container.hide()
+            
+            if not visible:
+                parentwidget = button.parent().parent()
+                self.searches_closedbuttons.append(parentwidget)
         
         def selectVariable(obj):
             self.selected_instance = obj
@@ -665,12 +731,15 @@ class Application(QWidget):
         def testSearch(text, obj):
             stext = text.lower().split(" ")
             cname = f"{obj.get_name().lower()} {obj.get_class().lower()} {obj.get_address()}"
-            return any([part in cname for part in stext])
+            return text == "" or any([part in cname for part in stext])
         
-        def findSearch(parent, text, current=[]):
+        def findSearch(parent, text, current=[], sid= -1):
             pcount = parent.count()
 
             for c in range(pcount):
+                if len(self.searches_current) > 1 and min(self.searches_current) == sid:
+                    break
+
                 childwidget = parent.itemAt(c).widget()
                 childlayout = childwidget.layout()
                 childinfo = childlayout.itemAt(0).widget()
@@ -686,7 +755,7 @@ class Application(QWidget):
                     cur = childwidget
                     parented = False
 
-                    while cur and cur in self.instance_buttons_rev:
+                    while cur and cur in self.instance_buttons_rev and (not cur in self.searches_closedbuttons) and (not sip.isdeleted(cur)):
                         curlayout = cur.layout()
                         curinfo = curlayout.itemAt(0).widget()
                         curinfolayout = curinfo.layout()
@@ -706,19 +775,38 @@ class Application(QWidget):
                     childcontainer.hide()
                     if childopen.text() == "▼": childopen.setText("►")
                 
-                findSearch(childcontainerlayout, text, current)
+                findSearch(childcontainerlayout, text, current, sid=sid)
                 QApplication.processEvents()
             
             return current
         
         def filterSearch(text):
             searchid = time.perf_counter_ns()
-            self.current_searches.append(searchid)
+            self.searches_current.append(searchid)
+            self.searches_closedbuttons = []
             
-            found = findSearch(self.dtframe, text, [])
+            found = findSearch(self.dtframe, text, [], sid=searchid)
 
-            self.current_searches.remove(searchid)
+            self.searches_current.remove(searchid)
             return found
+        
+        self.execute_globals = { "game": self.datamodel, "Vector3": Vector3, "Vector2": Vector2, "CFrame": CFrame }
+        self.execute_locals = {}
+        
+        def executeCode(text):
+            if text == "": return
+
+            try:
+                value = str(eval(text, self.execute_globals, self.execute_locals))
+            except Exception:
+                try:
+                    value = str(exec(text, self.execute_globals, self.execute_locals))
+                except Exception as error:
+                    value = str(error)
+
+            self.executebox.setText("")
+            self.executeresult.setText(f"> {value}\n{self.executeresult.toPlainText()}")
+            return value
         
         self.loadButton = loadButton
         self.showButton = showButton
@@ -728,6 +816,9 @@ class Application(QWidget):
 
         self.searchbox.textChanged.connect(filterSearch)
         self.searchbox.returnPressed.connect(lambda : filterSearch(self.searchbox.text()))
+
+        self.executebox.returnPressed.connect(lambda : executeCode(self.executebox.text()))
+        self.executebutton.clicked.connect(lambda : executeCode(self.executebox.text()))
 
         self.players = self.datamodel.get_service("Players")
         self.workspace = self.datamodel.get_service("Workspace")
