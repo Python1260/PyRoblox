@@ -19,7 +19,9 @@
 3) A window should appear and automatically install all the necessary requirements
 4) The actual application will now appear and attempt connection to the roblox process
 5) Once the status is green and reads "Connected", you should be able to explore this game's assets using the explorer on the right side of the app. Enjoy!
-
+6) *NEW* - See other player's positions through walls!
+7) *NEW* - Change your WalkSpeed and JumpPower in-game!
+8) *NEW* - Disable your character's collision!
 ---
 
 ## IMPORTANT
