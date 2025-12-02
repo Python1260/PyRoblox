@@ -11,7 +11,9 @@
   - Partially recover content from **LocalScripts** and **ModuleScripts**
   - Search for assets using *name*, *type* and *memory address*
   - *NEW* - See other player's positions through walls!
+  - *NEW* - Fling yourself up in the sky!
   - *NEW* - Change your WalkSpeed and JumpPower in-game!
+  - *NEW* - Teleport yourself to any position you want!
   - *NEW* - Disable your character's collision!
 ---
 
