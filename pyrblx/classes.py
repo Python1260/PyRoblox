@@ -70,13 +70,10 @@ class Scheduler():
         return RenderView(self.memory, self.memory.readptr(job + offset))
 
     def get_visualengine(self):
-        job = self.get_job("RenderJob")
-        rvoffset = self.memory.get_offset("RenderJobToRenderView")
-        veoffset = self.memory.get_offset("VisualEngine")
+        rv = self.get_renderview()
+        ve = rv.get_visualengine()
 
-        rv = self.memory.readptr(job + rvoffset)
-
-        return VisualEngine(self.memory, self.memory.readptr(rv + veoffset))
+        return ve
 
     def get_datamodel(self):
         fakedmoffset = self.memory.get_offset("FakeDataModelPointer")
@@ -292,6 +289,19 @@ class Instance():
 class RenderView(Instance):
     def __init__(self, memory, address):
         super().__init__(memory, address)
+    
+    def get_visualengine(self):
+        try:
+            offset = self.memory.get_offset("VisualEnginePointer")
+            veptr = self.memory.readptr(self.memory.base + offset)
+
+            if veptr == 0:
+                veoffset = self.memory.get_offset("VisualEngine")
+                veptr = self.memory.readptr(self.address + veoffset)
+
+            return VisualEngine(self.memory, veptr)
+        except Exception as e:
+            return VisualEngine(self.memory, 0)
 
 class VisualEngine(Instance):
     def __init__(self, memory, address):
@@ -398,7 +408,7 @@ class Workspace(Instance):
             return False
         try:
             offset = self.memory.get_offset("Gravity")
-            self.memory.writefloat(self.address + offset, value)
+            self.memory.writefloat(self.address + offset, float(value))
 
             return True
         except Exception as e:
@@ -567,7 +577,10 @@ class Humanoid(Instance):
             return False
         try:
             offset = self.memory.get_offset("WalkSpeed")
-            self.memory.writefloat(self.address + offset, value)
+            offsetcheck = self.memory.get_offset("WalkSpeedCheck")
+
+            self.memory.writefloat(self.address + offset, float(value))
+            self.memory.writefloat(self.address + offsetcheck, float(value))
 
             return True
         except Exception as e:
@@ -585,7 +598,7 @@ class Humanoid(Instance):
             return False
         try:
             offset = self.memory.get_offset("JumpPower")
-            self.memory.writefloat(self.address + offset, value)
+            self.memory.writefloat(self.address + offset, float(value))
 
             return True
         except Exception as e:
@@ -652,6 +665,14 @@ class Camera(Instance):
             return Instance.new(self.memory, addr)
         except Exception as e:
             return Instance.new(self.memory, 0)
+    
+    def get_fov(self):
+        try:
+            offset = self.memory.get_offset("FOV")
+
+            return (self.memory.readfloat(self.address + offset) / pi) * 180
+        except Exception as e:
+            return 0.0
 
 class BasePart(Instance):
     def __init__(self, memory, address):
@@ -686,7 +707,7 @@ class BasePart(Instance):
 
             prim = self.get_primitive()
             if prim:
-                return self.memory.writefloats(prim + posoffset, (vec.x, vec.y, vec.z))
+                return self.memory.writefloats(prim + posoffset, (float(vec.x), float(vec.y), float(vec.z)))
         except Exception:
             return False
         
@@ -714,7 +735,7 @@ class BasePart(Instance):
 
             prim = self.get_primitive()
             if prim:
-                return self.memory.writefloats(prim + sizeoffset, (vec.x, vec.y, vec.z))
+                return self.memory.writefloats(prim + sizeoffset, (float(vec.x), float(vec.y), float(vec.z)))
         except Exception:
             return False
         
@@ -742,7 +763,7 @@ class BasePart(Instance):
 
             prim = self.get_primitive()
             if prim:
-                return self.memory.writefloats(prim + rotoffset, (vec.x, vec.y, vec.z))
+                return self.memory.writefloats(prim + rotoffset, (float(vec.x), float(vec.y), float(vec.z)))
         except Exception:
             return False
         
@@ -979,11 +1000,9 @@ class ObjectValue(Instance):
     def get_value(self):
         try:
             offset = self.memory.get_offset("Value")
-            addr = self.memory.readptr(self.address + offset)
+            return Instance.new(self.memory, self.memory.readptr(self.address + offset))
         except Exception as e:
             return Instance.new(self.memory, 0)
-
-        return Instance.new(self.memory, addr)
 
     def set_value(self, value):
         if not self.memory or not self.address:

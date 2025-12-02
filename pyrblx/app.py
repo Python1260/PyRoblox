@@ -42,7 +42,7 @@ class Overlay(QWidget):
         self.setGeometry(0, 0, self.screen_width, self.screen_height)
         self.setStyleSheet("background-color: transparent;")
 
-        self.dots = {}
+        self.sections = {}
     
     def init_timer(self):
         self.maintimer = QTimer()
@@ -60,31 +60,44 @@ class Overlay(QWidget):
 
         radius = 3
 
-        for owner, dot in self.dots.items():
-            coords = dot()
+        for section, dots in self.sections.items():
+            copydots = dots.copy()
 
-            painter.setPen(pen_red)
-            painter.drawLine(round(coords[0]), round(coords[1]), round(coords[2]), round(coords[3]))
-            painter.setPen(pen_blue)
-            painter.drawEllipse(round(coords[0] - radius), round(coords[1] - radius), radius * 2, radius * 2)
+            for owner, dot in copydots.items():
+                coords = dot()
+
+                painter.setPen(pen_red)
+                painter.drawLine(round(coords[0]), round(coords[1]), round(coords[2]), round(coords[3]))
+                painter.setPen(pen_blue)
+                painter.drawEllipse(round(coords[0] - radius), round(coords[1] - radius), radius * 2, radius * 2)
         
         painter.end()
     
-    def setDot(self, owner, dot):
-        prevowner = next(iter(self.dots.items()))[0] if len(self.dots) == 1 else None
+    def addSection(self):
+        sectionid = len(self.sections)
+        self.sections[sectionid] = {}
 
-        if len(self.dots) == 1 and prevowner == owner:
-            self.dots = {}
+        return sectionid
+    
+    def setDot(self, sectionid, owner, dot):
+        dots = self.sections[sectionid]
+
+        prevowner = next(iter(dots.items()))[0] if len(dots) == 1 else None
+
+        if len(dots) == 1 and prevowner == owner:
+            self.sections[sectionid] = {}
             return None, prevowner
         else:
-            self.dots = { owner: dot }
+            self.sections[sectionid] = { owner: dot }
             return owner, prevowner
     
-    def addDot(self, owner, dot):
-        if owner in self.dots:
-            del self.dots[owner]
+    def addDot(self, sectionid, owner, dot):
+        dots = self.sections[sectionid]
+
+        if owner in dots:
+            del dots[owner]
         else:
-            self.dots[owner] = dot
+            dots[owner] = dot
 
 class Application(QWidget):
     signal = pyqtSignal()
@@ -122,6 +135,8 @@ class Application(QWidget):
 
         self.overlay = Overlay(self)
         self.memory = Memory(self)
+        self.overlay_section_part = self.overlay.addSection()
+        self.overlay_section_esp = self.overlay.addSection()
 
         self.handle_offsets()
     
@@ -287,6 +302,49 @@ class Application(QWidget):
 
         tabslayout.addTab(topwidget, "Execute")
 
+        downlayout = QVBoxLayout()
+        downwidget = QWidget()
+        downwidget.setLayout(downlayout)
+
+        esplayout = QHBoxLayout()
+        espwidget = QWidget()
+        espwidget.setLayout(esplayout)
+        self.espbox = QCheckBox("Enable ESP")
+        esplayout.addWidget(self.espbox)
+        downlayout.addWidget(espwidget)
+
+        spdlayout = QHBoxLayout()
+        spdwidget = QWidget()
+        spdwidget.setLayout(spdlayout)
+        spdlabel = QLabel("Player WalkSpeed: ")
+        self.spdtextbox = QLineEdit("16")
+        self.spdtextbox.setValidator(QIntValidator(bottom=0))
+        self.spdtextbox.setPlaceholderText("Input value here")
+        self.spdtextbox.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
+        self.spdbutton = QPushButton("Ok")
+        self.spdbutton.setStyleSheet("color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px;")
+        spdlayout.addWidget(spdlabel)
+        spdlayout.addWidget(self.spdtextbox)
+        spdlayout.addWidget(self.spdbutton)
+        downlayout.addWidget(spdwidget)
+
+        jumplayout = QHBoxLayout()
+        jumpwidget = QWidget()
+        jumpwidget.setLayout(jumplayout)
+        jumplabel = QLabel("Player JumpPower: ")
+        self.jumptextbox = QLineEdit("50")
+        self.jumptextbox.setValidator(QIntValidator(bottom=0))
+        self.jumptextbox.setPlaceholderText("Input value here")
+        self.jumptextbox.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
+        self.jumpbutton = QPushButton("Ok")
+        self.jumpbutton.setStyleSheet("color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px;")
+        jumplayout.addWidget(jumplabel)
+        jumplayout.addWidget(self.jumptextbox)
+        jumplayout.addWidget(self.jumpbutton)
+        downlayout.addWidget(jumpwidget)
+
+        tabslayout.addTab(downwidget, "Utilities")
+
         mainlayout.addWidget(tabslayout)
 
         self.filechoose = QPushButton("Choose offset file (JSON)")
@@ -308,7 +366,18 @@ class Application(QWidget):
     
     def init_hotkeys(self):
         if not self.registered:
+            def history_up():
+                if len(self.execute_history) > 0:
+                    self.executebox.setText(self.execute_history[self.execute_history_current])
+                    self.execute_history_current = min(self.execute_history_current + 1, len(self.execute_history) - 1)
+            def history_down():
+                if len(self.execute_history) > 0:
+                    self.executebox.setText(self.execute_history[self.execute_history_current])
+                    self.execute_history_current = max(self.execute_history_current - 1, 0)
+
             keyboard.add_hotkey('tab', self.toggle_safe)
+            keyboard.add_hotkey('up', history_up)
+            keyboard.add_hotkey('down', history_down)
 
             self.registered = True
     
@@ -345,6 +414,16 @@ class Application(QWidget):
             event.accept()
     
     def closeEvent(self, event):
+        self.enabled = False
+
+        self.initialized = False
+
+        self.attempts = 0
+        self.retry = 0
+
+        self.datamodel = None
+        self.visualengine = None
+        
         if self.registered:
             keyboard.unhook_all_hotkeys()
         
@@ -429,6 +508,9 @@ class Application(QWidget):
             self.memory.close()
         self.memory = Memory(self)
 
+        self.overlay_section_part = self.overlay.addSection()
+        self.overlay_section_esp = self.overlay.addSection()
+
         try:
             self.searchbox.textChanged.disconnect()
             self.searchbox.returnPressed.disconnect()
@@ -441,6 +523,16 @@ class Application(QWidget):
             pass
         try:
             self.executebutton.clicked.disconnect()
+        except Exception:
+            pass
+        try:
+            self.spdtextbox.returnPressed.disconnect()
+            self.spdbutton.clicked.disconnect()
+        except Exception:
+            pass
+        try:
+            self.jumptextbox.returnPressed.disconnect()
+            self.jumpbutton.clicked.disconnect()
         except Exception:
             pass
 
@@ -506,7 +598,7 @@ class Application(QWidget):
                     self.onInit()
 
                 self.onStep()
-            except Exception:
+            except Exception as e:
                 self.disable()
         
     def onInit(self):
@@ -792,9 +884,16 @@ class Application(QWidget):
         
         self.execute_globals = { "game": self.datamodel, "Vector3": Vector3, "Vector2": Vector2, "CFrame": CFrame }
         self.execute_locals = {}
+
+        self.execute_history = []
+        self.execute_history_current = 0
         
         def executeCode(text):
             if text == "": return
+
+            self.execute_history = self.execute_history[self.execute_history_current:len(self.execute_history)]
+            self.execute_history.insert(0, text)
+            self.execute_history_current = 0
 
             try:
                 value = str(eval(text, self.execute_globals, self.execute_locals))
@@ -808,6 +907,63 @@ class Application(QWidget):
             self.executeresult.setText(f"> {value}\n{self.executeresult.toPlainText()}")
             return value
         
+        def updateEspDots():
+            try:
+                while True:
+                    if self.espbox.isChecked():
+                        localplayer = self.players.get_localplayer()
+                        playerchildren = self.players.get_children()
+                        espdots = self.overlay.sections[self.overlay_section_esp].copy()
+
+                        for owner, dot in espdots.items():
+                            if not owner in playerchildren:
+                                self.overlay.addDot(self.overlay_section_esp, owner, 0)
+
+                        for child in playerchildren:
+                            if child == localplayer: continue
+
+                            if not child in espdots:
+                                character = child.get_character()
+                                if not character: continue
+                                root = character.find_first_child("HumanoidRootPart")
+                                if not root: continue
+
+                                self.overlay.addDot(self.overlay_section_esp, child, lambda r=root: getCFrame(self, r))
+                    else:
+                        self.overlay.sections[self.overlay_section_esp] = {}
+
+                    time.sleep(0.1)
+            except:
+                self.overlay.sections[self.overlay_section_esp] = {}
+        
+        def updateSpdWalkSpeed(text):
+            if text == "": return
+
+            try:
+                player = self.players.get_localplayer()
+                character = player.get_character()
+                if not character: return
+                humanoid = character.find_first_child("Humanoid")
+                if not humanoid: return
+
+                humanoid.set_walkspeed(float(text))
+            except:
+                pass
+        
+        def updateJumpJumpPower(text):
+            if text == "": return
+
+            try:
+                player = self.players.get_localplayer()
+                character = player.get_character()
+                if not character: return
+                humanoid = character.find_first_child("Humanoid")
+                if not humanoid: return
+
+                humanoid.set_jumppower(float(text))
+            except:
+                pass
+        
         self.loadButton = loadButton
         self.showButton = showButton
         self.updateButton = updateButton
@@ -820,9 +976,18 @@ class Application(QWidget):
         self.executebox.returnPressed.connect(lambda : executeCode(self.executebox.text()))
         self.executebutton.clicked.connect(lambda : executeCode(self.executebox.text()))
 
+        self.spdtextbox.returnPressed.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
+        self.spdbutton.clicked.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
+
+        self.jumptextbox.returnPressed.connect(lambda : updateJumpJumpPower(self.jumptextbox.text()))
+        self.jumpbutton.clicked.connect(lambda : updateJumpJumpPower(self.jumptextbox.text()))
+
         self.players = self.datamodel.get_service("Players")
         self.workspace = self.datamodel.get_service("Workspace")
         self.replicatedstorage = self.datamodel.get_service("ReplicatedStorage")
+
+        espdotsthread = threading.Thread(target=updateEspDots)
+        espdotsthread.start()
 
         loadButton(self.datamodel, self.dtframe, [self.players, self.workspace, self.replicatedstorage])
 

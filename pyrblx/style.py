@@ -1,23 +1,23 @@
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QScrollArea, QSizePolicy, QLineEdit, QFileDialog, QTabWidget, QTextEdit
 from PyQt5.QtCore import QTimer, Qt, QRect, pyqtSignal, QThread
-from PyQt5.QtGui import QFont, QPainter, QColor, QPen
+from PyQt5.QtGui import QFont, QPainter, QColor, QPen, QIntValidator
 import sip
 
+def getCFrame(app, obj):
+    cframe = obj.get_cframe()
+    cframe_adv = cframe + cframe.lookvector * 3
+
+    pos = app.visualengine.world_to_screen(cframe.position)
+    pos_adv = app.visualengine.world_to_screen(cframe_adv.position)
+
+    return (pos.x, pos.y, pos_adv.x, pos_adv.y)
+
 def displayPosition(app, obj):
-    def getCFrame():
-        cframe = obj.get_cframe()
-        cframe_adv = cframe + cframe.lookvector * 3
-
-        pos = app.visualengine.world_to_screen(cframe.position)
-        pos_adv = app.visualengine.world_to_screen(cframe_adv.position)
-
-        return (pos.x, pos.y, pos_adv.x, pos_adv.y)
-
     if obj in app.instance_buttons:
         childbutton = app.instance_buttons[obj]
 
         if not sip.isdeleted(childbutton):
-            selected, unselected = app.overlay.setDot(childbutton, getCFrame)
+            selected, unselected = app.overlay.setDot(app.overlay_section_part, childbutton, lambda : getCFrame(app, obj))
 
             if selected in app.instance_buttons_rev:
                 selectedbuttonlayout = selected.layout()
@@ -65,7 +65,8 @@ BASE_VARIABLES = {
     "Camera": {
         "Position": "get_position",
         "Orientation": "get_rotation",
-        "Subject": "get_subject"
+        "Subject": "get_subject",
+        "FieldOfView": "get_fov"
     },
     "BasePart": {
         "Position": "get_position",

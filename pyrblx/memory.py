@@ -307,23 +307,22 @@ class Memory():
     
     def readboolmask(self, address, mask):
         try:
-            byte = self.readbytes(address, 1)
+            byte = self.readbytes(address, 1)[0]
+
             return (byte & mask) != 0
         except Exception as e:
             return False
     
     def writeboolmask(self, address, mask, value):
-        self.protect(address, 1)
-        
         try:
-            byte = self.readbytes(address, 1)
+            byte = self.readbytes(address, 1)[0]
 
             if value:
                 byte |= mask
             else:
-                byte &= ~mask
+                byte &= ~mask & 0xFF
 
-            return self.writebytes(address, byte)
+            return self.writebytes(address, bytes([byte]))
         except Exception as e:
             return False
 
