@@ -877,7 +877,7 @@ class BasePart(Instance):
         maxz = float('-inf')
 
         for child in self.get_descendants():
-            if isinstance(child, (BasePart, MeshPart)):
+            if isinstance(child, BasePart):
                 pos = child.get_position()
                 size = child.get_size()
 

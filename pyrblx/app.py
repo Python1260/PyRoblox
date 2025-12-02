@@ -6,7 +6,7 @@ import threading
 
 from memory import Memory
 from datatypes import *
-from classes import Instance
+from classes import Instance, BasePart
 
 from style import *
 
@@ -343,6 +343,13 @@ class Application(QWidget):
         jumplayout.addWidget(self.jumpbutton)
         downlayout.addWidget(jumpwidget)
 
+        nocliplayout = QHBoxLayout()
+        noclipwidget = QWidget()
+        noclipwidget.setLayout(nocliplayout)
+        self.noclipbutton = QPushButton("Disable collision")
+        nocliplayout.addWidget(self.noclipbutton)
+        downlayout.addWidget(noclipwidget)
+
         tabslayout.addTab(downwidget, "Utilities")
 
         mainlayout.addWidget(tabslayout)
@@ -423,7 +430,7 @@ class Application(QWidget):
 
         self.datamodel = None
         self.visualengine = None
-        
+
         if self.registered:
             keyboard.unhook_all_hotkeys()
         
@@ -533,6 +540,10 @@ class Application(QWidget):
         try:
             self.jumptextbox.returnPressed.disconnect()
             self.jumpbutton.clicked.disconnect()
+        except Exception:
+            pass
+        try:
+            self.noclipbutton.clicked.disconnect()
         except Exception:
             pass
 
@@ -909,7 +920,7 @@ class Application(QWidget):
         
         def updateEspDots():
             try:
-                while True:
+                while self.enabled:
                     if self.espbox.isChecked():
                         localplayer = self.players.get_localplayer()
                         playerchildren = self.players.get_children()
@@ -964,6 +975,18 @@ class Application(QWidget):
             except:
                 pass
         
+        def updateNoclipCollision():
+            try:
+                player = self.players.get_localplayer()
+                character = player.get_character()
+                if not character: return
+
+                for child in character.get_descendants():
+                    if isinstance(child, BasePart):
+                        child.set_cancollide(False)
+            except:
+                pass
+        
         self.loadButton = loadButton
         self.showButton = showButton
         self.updateButton = updateButton
@@ -978,9 +1001,9 @@ class Application(QWidget):
 
         self.spdtextbox.returnPressed.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
         self.spdbutton.clicked.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
-
         self.jumptextbox.returnPressed.connect(lambda : updateJumpJumpPower(self.jumptextbox.text()))
         self.jumpbutton.clicked.connect(lambda : updateJumpJumpPower(self.jumptextbox.text()))
+        self.noclipbutton.clicked.connect(updateNoclipCollision)
 
         self.players = self.datamodel.get_service("Players")
         self.workspace = self.datamodel.get_service("Workspace")
