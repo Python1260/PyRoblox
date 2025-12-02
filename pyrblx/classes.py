@@ -794,6 +794,60 @@ class BasePart(Instance):
         
         return CFrame()
     
+    def set_cframe(self, cframe):
+        if not self.memory or not self.address:
+            return False
+        try:
+            cframeoffset = self.memory.get_offset("CFrame")
+
+            prim = self.get_primitive()
+            if prim:
+                r = cframe.rightvector
+                u = cframe.upvector
+                l = cframe.lookvector
+                p = cframe.position
+
+                data = [
+                    r.x, u.x, -l.x,
+                    r.y, u.y, -l.y,
+                    r.z, u.z, -l.z,
+                    p.x, p.y, p.z
+                ]
+
+                return self.memory.writefloats(prim + cframeoffset, data)
+        except Exception:
+            return False
+        
+        return False
+    
+    def get_velocity(self):
+        try:
+            veloffset = self.memory.get_offset("Velocity")
+
+            prim = self.get_primitive()
+            if prim:
+                vx, vy, vz = self.memory.readfloats(prim + veloffset, 3)
+
+                return Vector3(vx, vy, vz)
+        except Exception as e:
+            pass
+
+        return Vector3()
+    
+    def set_velocity(self, vec):
+        if not self.memory or not self.address:
+            return False
+        try:
+            veloffset = self.memory.get_offset("Velocity")
+
+            prim = self.get_primitive()
+            if prim:
+                return self.memory.writefloats(prim + veloffset, (float(vec.x), float(vec.y), float(vec.z)))
+        except Exception:
+            return False
+        
+        return False
+    
     def get_anchored(self):
         try:
             offset = self.memory.get_offset("Anchored")
@@ -853,20 +907,6 @@ class BasePart(Instance):
             return self.memory.writeboolmask(self.get_primitive() + offset, mask, value)
         except Exception as e:
             return False
-    
-    def get_velocity(self):
-        try:
-            veloffset = self.memory.get_offset("Velocity")
-
-            prim = self.get_primitive()
-            if prim:
-                vx, vy, vz = self.memory.readfloats(prim + veloffset, 3)
-
-                return Vector3(vx, vy, vz)
-        except Exception as e:
-            pass
-
-        return Vector3()
 
     def get_bounds(self):
         minx = float('inf')

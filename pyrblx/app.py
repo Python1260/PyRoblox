@@ -313,6 +313,13 @@ class Application(QWidget):
         esplayout.addWidget(self.espbox)
         downlayout.addWidget(espwidget)
 
+        flylayout = QHBoxLayout()
+        flywidget = QWidget()
+        flywidget.setLayout(flylayout)
+        self.flybox = QCheckBox("Enable FLY")
+        flylayout.addWidget(self.flybox)
+        downlayout.addWidget(flywidget)
+
         spdlayout = QHBoxLayout()
         spdwidget = QWidget()
         spdwidget.setLayout(spdlayout)
@@ -342,6 +349,31 @@ class Application(QWidget):
         jumplayout.addWidget(self.jumptextbox)
         jumplayout.addWidget(self.jumpbutton)
         downlayout.addWidget(jumpwidget)
+
+        teleportlayout = QHBoxLayout()
+        teleportwidget = QWidget()
+        teleportwidget.setLayout(teleportlayout)
+        teleportlabel = QLabel("Teleport: ")
+        self.teleporttextboxX = QLineEdit("0")
+        self.teleporttextboxX.setValidator(QIntValidator())
+        self.teleporttextboxX.setPlaceholderText("X")
+        self.teleporttextboxX.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
+        self.teleporttextboxY = QLineEdit("0")
+        self.teleporttextboxY.setValidator(QIntValidator())
+        self.teleporttextboxY.setPlaceholderText("Y")
+        self.teleporttextboxY.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
+        self.teleporttextboxZ = QLineEdit("0")
+        self.teleporttextboxZ.setValidator(QIntValidator())
+        self.teleporttextboxZ.setPlaceholderText("Z")
+        self.teleporttextboxZ.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
+        self.teleportbutton = QPushButton("Go")
+        self.teleportbutton.setStyleSheet("color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px;")
+        teleportlayout.addWidget(teleportlabel)
+        teleportlayout.addWidget(self.teleporttextboxX)
+        teleportlayout.addWidget(self.teleporttextboxY)
+        teleportlayout.addWidget(self.teleporttextboxZ)
+        teleportlayout.addWidget(self.teleportbutton)
+        downlayout.addWidget(teleportwidget)
 
         nocliplayout = QHBoxLayout()
         noclipwidget = QWidget()
@@ -540,6 +572,10 @@ class Application(QWidget):
         try:
             self.jumptextbox.returnPressed.disconnect()
             self.jumpbutton.clicked.disconnect()
+        except Exception:
+            pass
+        try:
+            self.teleportbutton.clicked.disconnect()
         except Exception:
             pass
         try:
@@ -947,12 +983,29 @@ class Application(QWidget):
             except:
                 self.overlay.sections[self.overlay_section_esp] = {}
         
+        def updateFlyVelocity():
+            try:
+                while self.enabled:
+                    if self.flybox.isChecked():
+                        localplayer = self.players.get_localplayer()
+                        character = localplayer.get_character()
+                        if not character: continue
+                        root = character.find_first_child("HumanoidRootPart")
+                        if not root: continue
+
+                        vel = Vector3(0.0, 500.0, 0.0)
+                        root.set_velocity(vel)
+                    
+                    time.sleep(0)
+            except:
+                pass
+        
         def updateSpdWalkSpeed(text):
             if text == "": return
 
             try:
-                player = self.players.get_localplayer()
-                character = player.get_character()
+                localplayer = self.players.get_localplayer()
+                character = localplayer.get_character()
                 if not character: return
                 humanoid = character.find_first_child("Humanoid")
                 if not humanoid: return
@@ -965,8 +1018,8 @@ class Application(QWidget):
             if text == "": return
 
             try:
-                player = self.players.get_localplayer()
-                character = player.get_character()
+                localplayer = self.players.get_localplayer()
+                character = localplayer.get_character()
                 if not character: return
                 humanoid = character.find_first_child("Humanoid")
                 if not humanoid: return
@@ -975,10 +1028,32 @@ class Application(QWidget):
             except:
                 pass
         
+        def updateTeleportPosition(tx, ty, tz):
+            if tx == "" or ty == "" or tz == "": return
+
+            try:
+                localplayer = self.players.get_localplayer()
+                character = localplayer.get_character()
+                if not character: return
+                root = character.find_first_child("HumanoidRootPart")
+                if not root: return
+
+                newpos = Vector3(float(tx), float(ty), float(tz))
+                newcframe = CFrame(newpos)
+                newvel = Vector3(0.0, 0.0, 0.0)
+
+                for i in range(self.fps):
+                    root.set_cframe(newcframe)
+                    root.set_position(newpos)
+                    root.set_velocity(newvel)
+                    time.sleep(0)
+            except:
+                pass
+        
         def updateNoclipCollision():
             try:
-                player = self.players.get_localplayer()
-                character = player.get_character()
+                localplayer = self.players.get_localplayer()
+                character = localplayer.get_character()
                 if not character: return
 
                 for child in character.get_descendants():
@@ -1003,6 +1078,7 @@ class Application(QWidget):
         self.spdbutton.clicked.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
         self.jumptextbox.returnPressed.connect(lambda : updateJumpJumpPower(self.jumptextbox.text()))
         self.jumpbutton.clicked.connect(lambda : updateJumpJumpPower(self.jumptextbox.text()))
+        self.teleportbutton.clicked.connect(lambda : updateTeleportPosition(self.teleporttextboxX.text(), self.teleporttextboxY.text(), self.teleporttextboxZ.text()))
         self.noclipbutton.clicked.connect(updateNoclipCollision)
 
         self.players = self.datamodel.get_service("Players")
@@ -1011,6 +1087,8 @@ class Application(QWidget):
 
         espdotsthread = threading.Thread(target=updateEspDots)
         espdotsthread.start()
+        flyvelocitythread = threading.Thread(target=updateFlyVelocity)
+        flyvelocitythread.start()
 
         loadButton(self.datamodel, self.dtframe, [self.players, self.workspace, self.replicatedstorage])
 

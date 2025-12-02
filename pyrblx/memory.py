@@ -106,7 +106,8 @@ class Memory():
     def pack_u32(self, v):
         return int(v).to_bytes(4, 'little', signed=False)
     
-    def protect(self, address, size=4, prot=PAGE_EXECUTE_READWRITE):
+    def protect(self, address, size=4, prot=PAGE_EXECUTE_READWRITE): # I think this is what made roblox crash
+        return True
         old_protect = ctypes.c_ulong()
         success = VirtualProtectEx(
             self.process.process_handle,
