@@ -907,6 +907,24 @@ class BasePart(Instance):
             return self.memory.writeboolmask(self.get_primitive() + offset, mask, value)
         except Exception as e:
             return False
+    
+    def get_transparency(self):
+        try:
+            offset = self.memory.get_offset("Transparency")
+
+            return self.memory.readfloat(self.address + offset)
+        except Exception as e:
+            return 0.0
+        
+    def set_transparency(self, value):
+        if not self.memory or not self.address:
+            return False
+        try:
+            offset = self.memory.get_offset("Transparency")
+
+            return self.memory.writefloat(self.address + offset, value)
+        except Exception as e:
+            return False
 
     def get_bounds(self):
         minx = float('inf')

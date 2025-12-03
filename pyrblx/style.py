@@ -1,9 +1,15 @@
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QScrollArea, QSizePolicy, QLineEdit, QFileDialog, QTabWidget, QTextEdit
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QScrollArea, QSizePolicy, QLineEdit, QFileDialog, QTabWidget, QTextEdit, QGraphicsOpacityEffect
 from PyQt5.QtCore import QTimer, Qt, QRect, pyqtSignal, QThread
 from PyQt5.QtGui import QFont, QPainter, QColor, QPen, QIntValidator
 import sip
 
+import time
+
+from classes import BasePart
+
 def getCFrame(app, obj):
+    if not obj or not isinstance(obj, BasePart): return (-1, -1, -1, -1)
+    
     cframe = obj.get_cframe()
     cframe_adv = cframe + cframe.lookvector * 3
 
@@ -73,29 +79,33 @@ BASE_VARIABLES = {
         "Orientation": "get_rotation",
         "Size": "get_size",
         "CFrame": "get_cframe",
+        "Velocity": "get_velocity",
         "Anchored": "get_anchored",
         "CanCollide": "get_cancollide",
         "CanTouch": "get_cantouch",
-        "Velocity": "get_velocity"
+        "Transparency": "get_transparency"
     },
     "Part": {
         "Position": "get_position",
         "Orientation": "get_rotation",
         "Size": "get_size",
         "CFrame": "get_cframe",
+        "Velocity": "get_velocity",
         "Anchored": "get_anchored",
         "CanCollide": "get_cancollide",
         "CanTouch": "get_cantouch",
-        "Velocity": "get_velocity"
+        "Transparency": "get_transparency"
     },
     "MeshPart": {
         "Position": "get_position",
         "Orientation": "get_rotation",
         "Size": "get_size",
         "CFrame": "get_cframe",
+        "Velocity": "get_velocity",
         "Anchored": "get_anchored",
         "CanCollide": "get_cancollide",
-        "CanTouch": "get_cantouch"
+        "CanTouch": "get_cantouch",
+        "Transparency": "get_transparency"
     },
     "IntValue": {
         "Value": "get_value"

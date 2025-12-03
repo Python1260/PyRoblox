@@ -65,6 +65,7 @@ class Overlay(QWidget):
 
             for owner, dot in copydots.items():
                 coords = dot()
+                if coords[0] < 0 or coords[1] < 0: continue
 
                 painter.setPen(pen_red)
                 painter.drawLine(round(coords[0]), round(coords[1]), round(coords[2]), round(coords[3]))
@@ -110,7 +111,7 @@ class Application(QWidget):
 
         self.maintimer = None
 
-        self.running = False
+        self.running = True
         self.enabled = False
         self.initialized = False
         self.timer = 0
@@ -353,7 +354,7 @@ class Application(QWidget):
         teleportlayout = QHBoxLayout()
         teleportwidget = QWidget()
         teleportwidget.setLayout(teleportlayout)
-        teleportlabel = QLabel("Teleport: ")
+        teleportlabel = QLabel("Teleport to position: ")
         self.teleporttextboxX = QLineEdit("0")
         self.teleporttextboxX.setValidator(QIntValidator())
         self.teleporttextboxX.setPlaceholderText("X")
@@ -375,12 +376,33 @@ class Application(QWidget):
         teleportlayout.addWidget(self.teleportbutton)
         downlayout.addWidget(teleportwidget)
 
+        teleportplayerlayout = QHBoxLayout()
+        teleportplayerwidget = QWidget()
+        teleportplayerwidget.setLayout(teleportplayerlayout)
+        teleportplayerlabel = QLabel("Teleport to player:    ")
+        self.teleportplayertextbox = QLineEdit("")
+        self.teleportplayertextbox.setPlaceholderText("Player name")
+        self.teleportplayertextbox.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
+        self.teleportplayerbutton = QPushButton("Go")
+        self.teleportplayerbutton.setStyleSheet("color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px;")
+        teleportplayerlayout.addWidget(teleportplayerlabel)
+        teleportplayerlayout.addWidget(self.teleportplayertextbox)
+        teleportplayerlayout.addWidget(self.teleportplayerbutton)
+        downlayout.addWidget(teleportplayerwidget)
+
         nocliplayout = QHBoxLayout()
         noclipwidget = QWidget()
         noclipwidget.setLayout(nocliplayout)
         self.noclipbutton = QPushButton("Disable collision")
         nocliplayout.addWidget(self.noclipbutton)
         downlayout.addWidget(noclipwidget)
+
+        invislayout = QHBoxLayout()
+        inviswidget = QWidget()
+        inviswidget.setLayout(invislayout)
+        self.invisbutton = QPushButton("Disable visibility")
+        invislayout.addWidget(self.invisbutton)
+        downlayout.addWidget(inviswidget)
 
         tabslayout.addTab(downwidget, "Utilities")
 
@@ -396,6 +418,35 @@ class Application(QWidget):
         self.exitbtn.setStyleSheet("background-color: #34d141; border: 1px solid #63ff70; color: white; font-weight: 600;")
         mainlayout.addWidget(self.exitbtn)
 
+        self.messagelabel = QLabel("")
+        self.messagelabel.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
+        mainlayout.addWidget(self.messagelabel)
+
+        self.messagetexts = []
+        self.messagetext_current = 0
+        self.messagetext_delay = 0.5
+        def message_set(msg, delay=0.5):
+            self.messagetexts = msg
+            self.messagetext_current = 0
+            self.messagetext_delay = delay
+        def message_update():
+            while self.running:
+                if len(self.messagetexts) != 0:
+                    if self.messagetext_current > (len(self.messagetexts) - 1):
+                        self.messagetext_current = 0
+
+                    self.messagelabel.setText(self.messagetexts[self.messagetext_current])
+                    self.messagetext_current += 1
+                
+                time.sleep(self.messagetext_delay)
+        
+        self.message_set = message_set
+        self.message_update = message_update
+        thread = threading.Thread(target=self.message_update)
+        thread.start()
+
+        self.message_set(["✦ Welcome", "✧ Welcome"])
+
         self.setLayout(mainlayout)
     
     def init_timer(self):
@@ -406,11 +457,11 @@ class Application(QWidget):
     def init_hotkeys(self):
         if not self.registered:
             def history_up():
-                if len(self.execute_history) > 0:
+                if hasattr(self, "execute_history") and len(self.execute_history) > 0:
                     self.executebox.setText(self.execute_history[self.execute_history_current])
                     self.execute_history_current = min(self.execute_history_current + 1, len(self.execute_history) - 1)
             def history_down():
-                if len(self.execute_history) > 0:
+                if hasattr(self, "execute_history") and len(self.execute_history) > 0:
                     self.executebox.setText(self.execute_history[self.execute_history_current])
                     self.execute_history_current = max(self.execute_history_current - 1, 0)
 
@@ -453,6 +504,7 @@ class Application(QWidget):
             event.accept()
     
     def closeEvent(self, event):
+        self.running = False
         self.enabled = False
 
         self.initialized = False
@@ -524,9 +576,16 @@ class Application(QWidget):
         self.status.setText("Status:               Connecting...")
         self.status.setStyleSheet("color: #ffa500; background-color: #2d2d2d; border-radius: 5px;")
 
+        hide = QGraphicsOpacityEffect()
+        hide.setOpacity(0)
         self.filechoose.setDisabled(True)
+        self.filechoose.setGraphicsEffect(hide)
+
+        self.message_set(["Loading", "▹ Loading", "▹▹ Loading..", "▹▹▻ Loading..."], 0.25)
     
     def disable(self):
+        self.message_set(["Loading", "▹ Loading", "▹▹ Loading..", "▹▹▻ Loading..."], 0.25)
+
         self.enabled = False
 
         self.initialized = False
@@ -579,7 +638,15 @@ class Application(QWidget):
         except Exception:
             pass
         try:
+            self.teleportplayerbutton.clicked.disconnect()
+        except Exception:
+            pass
+        try:
             self.noclipbutton.clicked.disconnect()
+        except Exception:
+            pass
+        try:
+            self.invisbutton.clicked.disconnect()
         except Exception:
             pass
 
@@ -597,7 +664,12 @@ class Application(QWidget):
         clearLayout(self.vrframe)
         clearLayout(self.dtframe)
 
+        show = QGraphicsOpacityEffect()
+        show.setOpacity(1)
         self.filechoose.setDisabled(False)
+        self.filechoose.setGraphicsEffect(show)
+
+        self.message_set(["▣ Stopped"])
     
     def run(self):
         self.init_timer()
@@ -642,6 +714,7 @@ class Application(QWidget):
             try:
                 if not self.initialized:
                     self.initialized = True
+                    self.message_set(["›  Running", "➤ Running"])
                     self.onInit()
 
                 self.onStep()
@@ -959,12 +1032,13 @@ class Application(QWidget):
                 while self.enabled:
                     if self.espbox.isChecked():
                         localplayer = self.players.get_localplayer()
+                        if not localplayer: continue
                         playerchildren = self.players.get_children()
                         espdots = self.overlay.sections[self.overlay_section_esp].copy()
 
                         for owner, dot in espdots.items():
                             if not owner in playerchildren:
-                                self.overlay.addDot(self.overlay_section_esp, owner, 0)
+                                self.overlay.addDot(self.overlay_section_esp, owner, False)
 
                         for child in playerchildren:
                             if child == localplayer: continue
@@ -979,7 +1053,7 @@ class Application(QWidget):
                     else:
                         self.overlay.sections[self.overlay_section_esp] = {}
 
-                    time.sleep(0.1)
+                    time.sleep(0)
             except:
                 self.overlay.sections[self.overlay_section_esp] = {}
         
@@ -988,6 +1062,7 @@ class Application(QWidget):
                 while self.enabled:
                     if self.flybox.isChecked():
                         localplayer = self.players.get_localplayer()
+                        if not localplayer: continue
                         character = localplayer.get_character()
                         if not character: continue
                         root = character.find_first_child("HumanoidRootPart")
@@ -1005,6 +1080,7 @@ class Application(QWidget):
 
             try:
                 localplayer = self.players.get_localplayer()
+                if not localplayer: return
                 character = localplayer.get_character()
                 if not character: return
                 humanoid = character.find_first_child("Humanoid")
@@ -1019,6 +1095,7 @@ class Application(QWidget):
 
             try:
                 localplayer = self.players.get_localplayer()
+                if not localplayer: return
                 character = localplayer.get_character()
                 if not character: return
                 humanoid = character.find_first_child("Humanoid")
@@ -1033,6 +1110,7 @@ class Application(QWidget):
 
             try:
                 localplayer = self.players.get_localplayer()
+                if not localplayer: return
                 character = localplayer.get_character()
                 if not character: return
                 root = character.find_first_child("HumanoidRootPart")
@@ -1050,15 +1128,59 @@ class Application(QWidget):
             except:
                 pass
         
+        def updateTeleportplayerPosition(tname):
+            if tname == "": return
+
+            try:
+                localplayer = self.players.get_localplayer()
+                if not localplayer: return
+                character = localplayer.get_character()
+                if not character: return
+                root = character.find_first_child("HumanoidRootPart")
+                if not root: return
+
+                tplayer = self.players.find_first_child(tname)
+                if not tplayer: return
+                tcharacter = tplayer.get_character()
+                if not tcharacter: return
+                troot = tcharacter.find_first_child("HumanoidRootPart")
+                if not troot: return
+
+                newpos = troot.get_position()
+                newcframe = CFrame(newpos)
+                newvel = Vector3(0.0, 0.0, 0.0)
+
+                for i in range(self.fps):
+                    root.set_cframe(newcframe)
+                    root.set_position(newpos)
+                    root.set_velocity(newvel)
+                    time.sleep(0)
+            except:
+                pass
+        
         def updateNoclipCollision():
             try:
                 localplayer = self.players.get_localplayer()
+                if not localplayer: return
                 character = localplayer.get_character()
                 if not character: return
 
                 for child in character.get_descendants():
                     if isinstance(child, BasePart):
                         child.set_cancollide(False)
+            except:
+                pass
+        
+        def updateInvisTransparency():
+            try:
+                localplayer = self.players.get_localplayer()
+                if not localplayer: return
+                character = localplayer.get_character()
+                if not character: return
+
+                for child in character.get_descendants():
+                    if isinstance(child, BasePart):
+                        child.set_transparency(1.0)
             except:
                 pass
         
@@ -1079,7 +1201,9 @@ class Application(QWidget):
         self.jumptextbox.returnPressed.connect(lambda : updateJumpJumpPower(self.jumptextbox.text()))
         self.jumpbutton.clicked.connect(lambda : updateJumpJumpPower(self.jumptextbox.text()))
         self.teleportbutton.clicked.connect(lambda : updateTeleportPosition(self.teleporttextboxX.text(), self.teleporttextboxY.text(), self.teleporttextboxZ.text()))
+        self.teleportplayerbutton.clicked.connect(lambda : updateTeleportplayerPosition(self.teleportplayertextbox.text()))
         self.noclipbutton.clicked.connect(updateNoclipCollision)
+        self.invisbutton.clicked.connect(updateInvisTransparency)
 
         self.players = self.datamodel.get_service("Players")
         self.workspace = self.datamodel.get_service("Workspace")
@@ -1090,7 +1214,7 @@ class Application(QWidget):
         flyvelocitythread = threading.Thread(target=updateFlyVelocity)
         flyvelocitythread.start()
 
-        loadButton(self.datamodel, self.dtframe, [self.players, self.workspace, self.replicatedstorage])
+        loadButton(self.datamodel, self.dtframe, [self.datamodel.get_service("Stats"), self.players, self.workspace, self.replicatedstorage])
 
         self.workspace_prevchildren = get_descendants_fast(self.workspace)
         self.replicatedstorage_prevchildren = get_descendants_fast(self.replicatedstorage)
