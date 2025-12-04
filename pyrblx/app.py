@@ -287,7 +287,7 @@ class Application(QWidget):
         self.executebox.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
 
         self.executebutton = QPushButton("Run")
-        self.executebutton.setStyleSheet("color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px;")
+        self.executebutton.setStyleSheet("QPushButton { color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px; } QPushButton:hover { background-color: #66d9ff; } QPushButton:pressed { background-color: #00a6e6; }")
 
         row.addWidget(self.executebox)
         row.addWidget(self.executebutton)
@@ -330,7 +330,7 @@ class Application(QWidget):
         self.spdtextbox.setPlaceholderText("Input value here")
         self.spdtextbox.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
         self.spdbutton = QPushButton("Ok")
-        self.spdbutton.setStyleSheet("color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px;")
+        self.spdbutton.setStyleSheet("QPushButton { color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px; } QPushButton:hover { background-color: #66d9ff; } QPushButton:pressed { background-color: #00a6e6; }")
         spdlayout.addWidget(spdlabel)
         spdlayout.addWidget(self.spdtextbox)
         spdlayout.addWidget(self.spdbutton)
@@ -345,7 +345,7 @@ class Application(QWidget):
         self.jumptextbox.setPlaceholderText("Input value here")
         self.jumptextbox.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
         self.jumpbutton = QPushButton("Ok")
-        self.jumpbutton.setStyleSheet("color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px;")
+        self.jumpbutton.setStyleSheet("QPushButton { color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px; } QPushButton:hover { background-color: #66d9ff; } QPushButton:pressed { background-color: #00a6e6; }")
         jumplayout.addWidget(jumplabel)
         jumplayout.addWidget(self.jumptextbox)
         jumplayout.addWidget(self.jumpbutton)
@@ -368,11 +368,14 @@ class Application(QWidget):
         self.teleporttextboxZ.setPlaceholderText("Z")
         self.teleporttextboxZ.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
         self.teleportbutton = QPushButton("Go")
-        self.teleportbutton.setStyleSheet("color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px;")
+        self.teleportbutton.setStyleSheet("QPushButton { color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px; } QPushButton:hover { background-color: #66d9ff; } QPushButton:pressed { background-color: #00a6e6; }")
+        self.teleportcurrentbutton = QPushButton("Current")
+        self.teleportcurrentbutton.setStyleSheet("QPushButton { color: #ffffff; background-color: #ff9800; border-color: #ff9800; border-radius: 3px; } QPushButton:hover { background-color: #ffb84d; } QPushButton:pressed { background-color: #e68a00; }")
         teleportlayout.addWidget(teleportlabel)
         teleportlayout.addWidget(self.teleporttextboxX)
         teleportlayout.addWidget(self.teleporttextboxY)
         teleportlayout.addWidget(self.teleporttextboxZ)
+        teleportlayout.addWidget(self.teleportcurrentbutton)
         teleportlayout.addWidget(self.teleportbutton)
         downlayout.addWidget(teleportwidget)
 
@@ -384,7 +387,7 @@ class Application(QWidget):
         self.teleportplayertextbox.setPlaceholderText("Player name")
         self.teleportplayertextbox.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
         self.teleportplayerbutton = QPushButton("Go")
-        self.teleportplayerbutton.setStyleSheet("color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px;")
+        self.teleportplayerbutton.setStyleSheet("QPushButton { color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px; } QPushButton:hover { background-color: #66d9ff; } QPushButton:pressed { background-color: #00a6e6; }")
         teleportplayerlayout.addWidget(teleportplayerlabel)
         teleportplayerlayout.addWidget(self.teleportplayertextbox)
         teleportplayerlayout.addWidget(self.teleportplayerbutton)
@@ -394,7 +397,9 @@ class Application(QWidget):
         noclipwidget = QWidget()
         noclipwidget.setLayout(nocliplayout)
         self.noclipbutton = QPushButton("Disable collision")
+        self.notouchbutton = QPushButton("Disable touch")
         nocliplayout.addWidget(self.noclipbutton)
+        nocliplayout.addWidget(self.notouchbutton)
         downlayout.addWidget(noclipwidget)
 
         invislayout = QHBoxLayout()
@@ -634,6 +639,7 @@ class Application(QWidget):
         except Exception:
             pass
         try:
+            self.teleportcurrentbutton.clicked.disconnect()
             self.teleportbutton.clicked.disconnect()
         except Exception:
             pass
@@ -643,6 +649,7 @@ class Application(QWidget):
             pass
         try:
             self.noclipbutton.clicked.disconnect()
+            self.notouchbutton.clicked.disconnect()
         except Exception:
             pass
         try:
@@ -1106,6 +1113,23 @@ class Application(QWidget):
             except:
                 pass
         
+        def updateTeleportCurrentposition():
+            try:
+                localplayer = self.players.get_localplayer()
+                if not localplayer: return
+                character = localplayer.get_character()
+                if not character: return
+                root = character.find_first_child("HumanoidRootPart")
+                if not root: return
+
+                pos = root.get_position()
+
+                self.teleporttextboxX.setText(f"{pos.x:.3f}")
+                self.teleporttextboxY.setText(f"{pos.y:.3f}")
+                self.teleporttextboxZ.setText(f"{pos.z:.3f}")
+            except:
+                pass
+
         def updateTeleportPosition(tx, ty, tz):
             if tx == "" or ty == "" or tz == "": return
 
@@ -1172,6 +1196,19 @@ class Application(QWidget):
             except:
                 pass
         
+        def updateNoclipTouch():
+            try:
+                localplayer = self.players.get_localplayer()
+                if not localplayer: return
+                character = localplayer.get_character()
+                if not character: return
+
+                for child in character.get_descendants():
+                    if isinstance(child, BasePart):
+                        child.set_cantouch(False)
+            except:
+                pass
+        
         def updateInvisTransparency():
             try:
                 localplayer = self.players.get_localplayer()
@@ -1201,9 +1238,11 @@ class Application(QWidget):
         self.spdbutton.clicked.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
         self.jumptextbox.returnPressed.connect(lambda : updateJumpJumpPower(self.jumptextbox.text()))
         self.jumpbutton.clicked.connect(lambda : updateJumpJumpPower(self.jumptextbox.text()))
+        self.teleportcurrentbutton.clicked.connect(updateTeleportCurrentposition)
         self.teleportbutton.clicked.connect(lambda : updateTeleportPosition(self.teleporttextboxX.text(), self.teleporttextboxY.text(), self.teleporttextboxZ.text()))
         self.teleportplayerbutton.clicked.connect(lambda : updateTeleportplayerPosition(self.teleportplayertextbox.text()))
         self.noclipbutton.clicked.connect(updateNoclipCollision)
+        self.notouchbutton.clicked.connect(updateNoclipTouch)
         self.invisbutton.clicked.connect(updateInvisTransparency)
 
         self.players = self.datamodel.get_service("Players")
