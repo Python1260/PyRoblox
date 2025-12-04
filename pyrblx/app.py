@@ -949,7 +949,7 @@ class Application(QWidget):
             pcount = parent.count()
 
             for c in range(pcount):
-                if len(self.searches_current) > 1 and min(self.searches_current) == sid:
+                if (len(self.searches_current) and min(self.searches_current) == sid) > 1 or not self.enabled:
                     break
 
                 childwidget = parent.itemAt(c).widget()
@@ -981,26 +981,27 @@ class Application(QWidget):
 
                         cur = cur.parent().parent()
                         parented = True
-                        QApplication.processEvents()
                 else:
                     childwidget.hide()
                     childcontainer.hide()
                     if childopen.text() == "▼": childopen.setText("►")
                 
                 findSearch(childcontainerlayout, text, current, sid=sid)
-                QApplication.processEvents()
             
             return current
         
         def filterSearch(text):
-            searchid = time.perf_counter_ns()
-            self.searches_current.append(searchid)
-            self.searches_closedbuttons = []
-            
-            found = findSearch(self.dtframe, text, [], sid=searchid)
+            def search():
+                searchid = time.perf_counter_ns()
+                self.searches_current.append(searchid)
+                self.searches_closedbuttons = []
 
-            self.searches_current.remove(searchid)
-            return found
+                findSearch(self.dtframe, text, [], sid=searchid)
+
+                self.searches_current.remove(searchid)
+            
+            thread = threading.Thread(target=search)
+            thread.start()
         
         self.execute_globals = { "game": self.datamodel, "Vector3": Vector3, "Vector2": Vector2, "CFrame": CFrame }
         self.execute_locals = {}

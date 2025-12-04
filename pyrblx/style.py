@@ -130,6 +130,9 @@ BASE_VARIABLES = {
     },
     "Sound": {
         "SoundId": "get_soundid"
+    },
+    "Animation": {
+        "AnimationId": "get_animationid"
     }
 }
 

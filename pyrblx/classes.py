@@ -978,10 +978,8 @@ class IntValue(Instance):
         if not self.memory or not self.address:
             return False
         try:
-            offset = self.memory.get_offset("Value")
-            self.memory.writeint(self.address + offset, value)
-
-            return True
+            offset = self.memory.get_offset("ValueGetSetToValue")
+            return self.memory.writeint(self.address + offset, value)
         except Exception as e:
             return False
 
@@ -1000,10 +998,8 @@ class NumberValue(Instance):
         if not self.memory or not self.address:
             return False
         try:
-            offset = self.memory.get_offset("Value")
-            self.memory.writedouble(self.address + offset, value)
-
-            return True
+            offset = self.memory.get_offset("ValueGetSetToValue")
+            return self.memory.writedouble(self.address + offset, value)
         except Exception as e:
             return False
 
@@ -1022,10 +1018,8 @@ class BoolValue(Instance):
         if not self.memory or not self.address:
             return False
         try:
-            offset = self.memory.get_offset("Value")
-            self.memory.writebool(self.address + offset, value)
-
-            return True
+            offset = self.memory.get_offset("ValueGetSetToValue")
+            return self.memory.writebool(self.address + offset, value)
         except Exception as e:
             return False
 
@@ -1044,10 +1038,8 @@ class StringValue(Instance):
         if not self.memory or not self.address:
             return False
         try:
-            offset = self.memory.get_offset("Value")
-            self.memory.writestring2(self.address + offset, value)
-
-            return True
+            offset = self.memory.get_offset("ValueGetSetToValue")
+            return self.memory.writestring2(self.address + offset, value)
         except Exception as e:
             return False
 
@@ -1066,10 +1058,8 @@ class ObjectValue(Instance):
         if not self.memory or not self.address:
             return False
         try:
-            offset = self.memory.get_offset("Value")
-            self.memory.writeptr(self.address + offset, value.address)
-
-            return True
+            offset = self.memory.get_offset("ValueGetSetToValue")
+            return self.memory.writeptr(self.address + offset, value.address)
         except Exception as e:
             return False
 
@@ -1197,6 +1187,35 @@ class Sound(Instance):
             return self.memory.readnumber(self.address + offset)
         except Exception as e:
             return 0
+
+    def set_soundid(self, value):
+        if not self.memory or not self.address:
+            return False
+        try:
+            offset = self.memory.get_offset("SoundId")
+            return self.memory.writenumber(self.address + offset, value)
+        except Exception as e:
+            return False
+
+class Animation(Instance):
+    def __init__(self, memory, address):
+        super().__init__(memory, address)
+    
+    def get_animationid(self):
+        try:
+            offset = self.memory.get_offset("AnimationId")
+            return self.memory.readnumber(self.address + offset)
+        except Exception as e:
+            return 0
+    
+    def set_animationid(self, value):
+        if not self.memory or not self.address:
+            return False
+        try:
+            offset = self.memory.get_offset("AnimationId")
+            return self.memory.writenumber(self.address + offset, value)
+        except Exception as e:
+            return False
     
 CLASSTYPES = {
     "ScriptContext": ScriptContext,
@@ -1219,5 +1238,6 @@ CLASSTYPES = {
     "Script": Script,
     "LocalScript": LocalScript,
     "ModuleScript": ModuleScript,
-    "Sound": Sound
+    "Sound": Sound,
+    "Animation": Animation
 }
