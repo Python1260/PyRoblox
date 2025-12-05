@@ -14,7 +14,7 @@
   - *NEW* - Fling yourself up in the sky!
   - *NEW* - Change your WalkSpeed and JumpPower in-game!
   - *NEW* - Teleport yourself to any position you want!
-  - *NEW* - Disable your character's collision!
+  - *NEW* - Disable your character's collision/damage from killbricks!
 ---
 
 ## Usage
