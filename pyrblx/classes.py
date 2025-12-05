@@ -458,13 +458,6 @@ class Player(Instance):
             return self.memory.readnumber(self.address + offset)
         except Exception as e:
             return 0
-    
-    def get_ping(self):
-        try:
-            offset = self.memory.get_offset("Ping")
-            return self.memory.readfloat(self.address + offset)
-        except Exception as e:
-            return 0.0
         
     def get_team(self):
         try:
@@ -1216,6 +1209,74 @@ class Animation(Instance):
             return self.memory.writenumber(self.address + offset, value)
         except Exception as e:
             return False
+
+class Frame(Instance):
+    def __init__(self, memory, address):
+        super().__init__(memory, address)
+    
+    def get_visible(self):
+        try:
+            voffset = self.memory.get_offset("FrameVisible")
+            return self.memory.readbool(self.address + voffset)
+        except Exception as e:
+            return False
+    
+    def get_position(self):
+        try:
+            sxoffset = self.memory.get_offset("FramePositionX")
+            oxoffset = self.memory.get_offset("FramePositionOffsetX")
+            syoffset = self.memory.get_offset("FramePositionY")
+            oyoffset = self.memory.get_offset("FramePositionOffsetY")
+
+            sx = self.memory.readfloat(self.address + sxoffset)
+            ox = self.memory.readfloat(self.address + oxoffset)
+            sy = self.memory.readfloat(self.address + syoffset)
+            oy = self.memory.readfloat(self.address + oyoffset)
+
+            return Udim2(sx, ox, sy, oy)
+        except Exception as e:
+            return Udim2()
+    
+    def get_size(self):
+        try:
+            sxoffset = self.memory.get_offset("FrameSizeX")
+            oxoffset = self.memory.get_offset("FrameSizeOffsetX")
+            syoffset = self.memory.get_offset("FrameSizeY")
+            oyoffset = self.memory.get_offset("FrameSizeOffsetY")
+
+            sx = self.memory.readfloat(self.address + sxoffset)
+            ox = self.memory.readfloat(self.address + oxoffset)
+            sy = self.memory.readfloat(self.address + syoffset)
+            oy = self.memory.readfloat(self.address + oyoffset)
+
+            return Udim2(sx, ox, sy, oy)
+        except Exception as e:
+            return Udim2()
+    
+    def get_rotation(self):
+        try:
+            roffset = self.memory.get_offset("FrameRotation")
+            return self.memory.readfloat(self.address + roffset)
+        except Exception as e:
+            return 0.0
+
+class TextLabel(Instance):
+    def __init__(self, memory, address):
+        super().__init__(memory, address)
+    
+    def get_visible(self):
+        try:
+            voffset = self.memory.get_offset("TextLabelVisible")
+            return self.memory.readbool(self.address + voffset)
+        except Exception as e:
+            return False
+    
+    def get_text(self):
+        try:
+            offset = self.memory.get_offset("TextLabelText")
+            return self.memory.readstring2(self.address + offset)
+        except Exception as e:
+            return ""
     
 CLASSTYPES = {
     "ScriptContext": ScriptContext,
@@ -1239,5 +1300,7 @@ CLASSTYPES = {
     "LocalScript": LocalScript,
     "ModuleScript": ModuleScript,
     "Sound": Sound,
-    "Animation": Animation
+    "Animation": Animation,
+    "Frame": Frame,
+    "TextLabel": TextLabel
 }

@@ -3,14 +3,13 @@ import os
 import pymem
 import pymem.process
 from pymem.ressources.kernel32 import VirtualProtectEx
-from pymem.ressources.structure import MEMORY_BASIC_INFORMATION
 
 import ctypes
-from ctypes import wintypes
 import struct
 import psutil
-import re
+
 import json
+import dirtyjson
 import requests
 
 from classes import *
@@ -37,11 +36,17 @@ class Memory():
         self.load_offsets()
 
     def download_offsets(self, target):
-        data = requests.get("https://raw.githubusercontent.com/NtReadVirtualMemory/Roblox-Offsets-Website/main/offsets.json")
-
-        if data and data.status_code == 200 and data.content:
-            with open(target, 'w') as file:
-                json.dump(data.json(), file, indent=1)
+        request = requests.get("https://raw.githubusercontent.com/NtReadVirtualMemory/Roblox-Offsets-Website/main/offsets.json")
+        data = {}
+        
+        if request and request.status_code == 200 and request.content:
+                try:
+                    data = dirtyjson.loads(request.text)
+                except Exception as e:
+                    pass
+        
+        with open(target, 'w') as file:
+            json.dump(data, file, indent=1)
 
     def load_offsets_default(self):
         self.offsets.setdefault("ClassDescriptorToPropertyDescriptor", "0x9C0")

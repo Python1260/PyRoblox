@@ -133,6 +133,16 @@ BASE_VARIABLES = {
     },
     "Animation": {
         "AnimationId": "get_animationid"
+    },
+    "Frame": {
+        "Visible": "get_visible",
+        "Position": "get_position",
+        "Size": "get_size",
+        "Rotation": "get_rotation"
+    },
+    "TextLabel": {
+        "Visible": "get_visible",
+        "Text": "get_text"
     }
 }
 

@@ -1254,7 +1254,7 @@ class Application(QWidget):
         flyvelocitythread = threading.Thread(target=updateFlyVelocity)
         flyvelocitythread.start()
 
-        loadButton(self.datamodel, self.dtframe, [self.datamodel.get_service("Stats"), self.players, self.workspace, self.replicatedstorage])
+        loadButton(self.datamodel, self.dtframe, [self.players, self.workspace, self.replicatedstorage])
 
         self.workspace_prevchildren = get_descendants_fast(self.workspace)
         self.replicatedstorage_prevchildren = get_descendants_fast(self.replicatedstorage)

@@ -234,6 +234,46 @@ class CFrame():
             self.position.X, self.position.Y, self.position.Z
         ])
 
+class Udim2():
+    def __init__(self, sx=0.0, ox=0.0, sy=0.0, oy=0.0):
+        self.scalex = sx
+        self.offsetx = ox
+        self.scaley = sy
+        self.offsety = oy
+    
+    def __str__(self):
+        return f"X Scale: {self.scalex}, X Offset: {self.offsetx}, Y Scale: {self.scaley}, Y Offset: {self.offsety}"
+    
+    def __eq__(self, value):
+        return (
+            isinstance(value, Udim2)
+            and self.scalex == value.scalex
+            and self.offsetx == value.offsetx
+            and self.scaley == value.scaley
+            and self.offsety == value.offsety
+        )
+
+    def __add__(self, value):
+        return Udim2(self.scalex + value.scalex, self.offsetx + value.offsetx, self.scaley + value.scaley, self.offsety + value.offsety)
+
+    def __sub__(self, value):
+        return Udim2(self.scalex - value.scalex, self.offsetx - value.offsetx, self.scaley - value.scaley, self.offsety - value.offsety)
+    
+    def __mul__(self, value):
+        if isinstance(value, Udim2):
+            return Udim2(self.scalex * value.scalex, self.offsetx * value.offsetx, self.scaley * value.scaley, self.offsety * value.offsety)
+        return Udim2(self.scalex * value, self.offsetx * value, self.scaley * value, self.offsety * value)
+    
+    __rmul__ = __mul__
+
+    def __truediv__(self, value):
+        if isinstance(value, Udim2):
+            return Udim2(self.scalex / value.scalex, self.offsetx / value.offsetx, self.scaley / value.scaley, self.offsety / value.offsety)
+        return Udim2(self.scalex / value, self.offsetx / value, self.scaley / value, self.offsety / value)
+    
+    def __neg__(self):
+        return Udim2(-self.scalex, -self.offsetx, -self.scaley, -self.offsety)
+
 class Quat():
     def __init__(self, x=0.0, y=0.0, z=0.0, w=0.0):
         self.x = x
