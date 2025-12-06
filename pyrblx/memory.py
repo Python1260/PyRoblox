@@ -21,7 +21,6 @@ MEM_COMMIT = 0x1000
 class Memory():
     def __init__(self, app):
         self.app = app
-        self.struct = struct
 
         self.target = "RobloxPlayerBeta.exe"
 
@@ -96,7 +95,7 @@ class Memory():
             module = pymem.process.module_from_name(self.process.process_handle, name)
             self.base = module.lpBaseOfDll
 
-            self.scheduler = Scheduler(self)
+            self.scheduler = TaskScheduler(self)
 
             return True
         except Exception:

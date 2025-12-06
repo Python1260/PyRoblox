@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QApplication
 from datatypes import *
 from subclasses import *
 
-class Scheduler():
+class TaskScheduler():
     def __init__(self, memory):
         self.memory = memory
     
@@ -159,75 +159,7 @@ class Instance():
             return self.memory.writeptr(self.address + offset, parent.address)
         except Exception:
             return False
-    
-    def trialanderror(self, base, amount=1000):
-        offset = 0x0
-
-        print("--- TRIAL AND ERROR INIT ---")
-        for i in range(amount):
-            prop_begin = self.memory.readptr(base + offset)
-            prop_end = self.memory.readptr(base + offset + 0x8)
-            length = (prop_end - prop_begin) / 8
-
-            if prop_begin != 0 and prop_end != 0 and prop_end > prop_begin and ((prop_end - prop_begin) / 8) % 1 == 0 and length <= 1024:
-                print(f"Begin: {prop_begin}, End: {prop_end}, Length: {length}, Offset: {hex(offset)}")
-
-            offset += 0x8
-    
-    def get_propertydescriptors(self):
-        desc = []
-
-        try:
-            offset = self.memory.get_offset("ClassDescriptorToPropertyDescriptor")
-            return self.memory.readlist(self.get_class_descriptor() + offset, lambda addr : PropertyDescriptor(self.memory, addr, self))
-        except Exception as e:
-            pass
-
-        return desc
-    
-    def get_propertydescriptor(self, name):
-        for obj in self.get_propertydescriptors():
-            if obj.get_name() == name:
-                return obj
         
-        return PropertyDescriptor(self.memory, 0, self)
-    
-    def get_eventdescriptors(self):
-        desc = []
-
-        try:
-            offset = self.memory.get_offset("ClassDescriptorToEventDescriptor")
-            return self.memory.readlist(self.get_class_descriptor() + offset, lambda addr : EventDescriptor(self.memory, addr, self))
-        except Exception as e:
-            pass
-
-        return desc
-
-    def get_eventdescriptor(self, name):
-        for obj in self.get_eventdescriptors():
-            if obj.get_name() == name:
-                return obj
-        
-        return EventDescriptor(self.memory, 0, self)
-    
-    def get_boundfunctions(self):
-        funcs = []
-
-        try:
-            offset = self.memory.get_offset("ClassDescriptorToBoundFunction")
-            return self.memory.readlist(self.get_class_descriptor() + offset, lambda addr : BoundFunction(self.memory, addr, self))
-        except Exception as e:
-            pass
-
-        return funcs
-
-    def get_boundfunction(self, name):
-        for obj in self.get_boundfunctions():
-            if obj.get_name() == name:
-                return obj
-        
-        return BoundFunction(self.memory, 0, self)
-
     def get_fullname(self):
         parent = self.get_parent()
         name = self.get_name()
