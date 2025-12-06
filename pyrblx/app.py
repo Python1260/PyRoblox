@@ -640,10 +640,14 @@ class Application(QWidget):
             pass
         try:
             self.teleportcurrentbutton.clicked.disconnect()
+            self.teleporttextboxX.returnPressed.disconnect()
+            self.teleporttextboxY.returnPressed.disconnect()
+            self.teleporttextboxZ.returnPressed.disconnect()
             self.teleportbutton.clicked.disconnect()
         except Exception:
             pass
         try:
+            self.teleportplayertextbox.returnPressed.disconnect()
             self.teleportplayerbutton.clicked.disconnect()
         except Exception:
             pass
@@ -789,6 +793,8 @@ class Application(QWidget):
             self.instance_buttons_rev[main_widget] = obj
 
             for idx, child in enumerate(objchildren):
+                if not self.enabled: break
+
                 name.setText(f"{objname} ({objclass})    LOADING {(idx + 1)}/{len(objchildren)}")
                 loadButton(child, container_layout)
                 QApplication.processEvents()
@@ -1036,52 +1042,55 @@ class Application(QWidget):
             return value
         
         def updateEspDots():
-            try:
                 while self.enabled:
+                    section = self.overlay.sections[self.overlay_section_esp]
+
                     if self.espbox.isChecked():
-                        localplayer = self.players.get_localplayer()
-                        if not localplayer: continue
-                        playerchildren = self.players.get_children()
-                        espdots = self.overlay.sections[self.overlay_section_esp].copy()
+                        try:
+                            localplayer = self.players.get_localplayer()
+                            if not localplayer: continue
+                            playerchildren = self.players.get_children()
+                            espdots = section.copy()
 
-                        for owner, dot in espdots.items():
-                            if not owner in playerchildren:
-                                self.overlay.addDot(self.overlay_section_esp, owner, False)
+                            for owner, dot in espdots.items():
+                                if not owner in playerchildren:
+                                    self.overlay.addDot(self.overlay_section_esp, owner, False)
 
-                        for child in playerchildren:
-                            if child == localplayer: continue
+                            for child in playerchildren:
+                                if child == localplayer: continue
 
-                            if not child in espdots:
-                                character = child.get_character()
-                                if not character: continue
-                                root = character.find_first_child("HumanoidRootPart")
-                                if not root: continue
+                                if not child in espdots:
+                                    character = child.get_character()
+                                    if not character: continue
+                                    root = character.find_first_child("HumanoidRootPart")
+                                    if not root: continue
 
-                                self.overlay.addDot(self.overlay_section_esp, child, lambda r=root: getCFrame(self, r))
+                                    self.overlay.addDot(self.overlay_section_esp, child, lambda r=root: getCFrame(self, r))
+                        except:
+                            self.overlay.sections[self.overlay_section_esp] = {}
                     else:
-                        self.overlay.sections[self.overlay_section_esp] = {}
+                        if len(section) > 0:
+                            self.overlay.sections[self.overlay_section_esp] = {}
 
                     time.sleep(0)
-            except:
-                self.overlay.sections[self.overlay_section_esp] = {}
         
         def updateFlyVelocity():
-            try:
                 while self.enabled:
                     if self.flybox.isChecked():
-                        localplayer = self.players.get_localplayer()
-                        if not localplayer: continue
-                        character = localplayer.get_character()
-                        if not character: continue
-                        root = character.find_first_child("HumanoidRootPart")
-                        if not root: continue
+                        try:
+                            localplayer = self.players.get_localplayer()
+                            if not localplayer: continue
+                            character = localplayer.get_character()
+                            if not character: continue
+                            root = character.find_first_child("HumanoidRootPart")
+                            if not root: continue
 
-                        vel = Vector3(0.0, 500.0, 0.0)
-                        root.set_velocity(vel)
+                            vel = Vector3(0.0, 500.0, 0.0)
+                            root.set_velocity(vel)
+                        except:
+                            pass
                     
                     time.sleep(0)
-            except:
-                pass
         
         def updateSpdWalkSpeed(text):
             if text == "": return
@@ -1239,7 +1248,11 @@ class Application(QWidget):
         self.jumptextbox.returnPressed.connect(lambda : updateJumpJumpPower(self.jumptextbox.text()))
         self.jumpbutton.clicked.connect(lambda : updateJumpJumpPower(self.jumptextbox.text()))
         self.teleportcurrentbutton.clicked.connect(updateTeleportCurrentposition)
+        self.teleporttextboxX.returnPressed.connect(self.teleporttextboxY.setFocus)
+        self.teleporttextboxY.returnPressed.connect(self.teleporttextboxZ.setFocus)
+        self.teleporttextboxZ.returnPressed.connect(lambda : updateTeleportPosition(self.teleporttextboxX.text(), self.teleporttextboxY.text(), self.teleporttextboxZ.text()))
         self.teleportbutton.clicked.connect(lambda : updateTeleportPosition(self.teleporttextboxX.text(), self.teleporttextboxY.text(), self.teleporttextboxZ.text()))
+        self.teleportplayertextbox.returnPressed.connect(lambda : updateTeleportplayerPosition(self.teleportplayertextbox.text()))
         self.teleportplayerbutton.clicked.connect(lambda : updateTeleportplayerPosition(self.teleportplayertextbox.text()))
         self.noclipbutton.clicked.connect(updateNoclipCollision)
         self.notouchbutton.clicked.connect(updateNoclipTouch)
