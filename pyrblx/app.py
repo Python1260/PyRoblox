@@ -7,6 +7,7 @@ import threading
 from memory import Memory
 from datatypes import *
 from classes import Instance, BasePart
+from Luau.compiler import Compiler
 
 from style import *
 
@@ -127,6 +128,14 @@ class Application(QWidget):
         self.registered = False
         self.dragging = False
         self.position = None
+
+        self.execute_globals = { "game": self.datamodel, "Vector3": Vector3, "Vector2": Vector2, "CFrame": CFrame }
+        self.execute_locals = {}
+
+        self.execute_history = []
+        self.execute_history_current = 0
+
+        self.inject_copiedbytecode = b""
 
         self.signal.connect(self.toggle)
 
@@ -411,6 +420,40 @@ class Application(QWidget):
 
         tabslayout.addTab(downwidget, "Utilities")
 
+        uplayout = QVBoxLayout()
+        upwidget = QWidget()
+        upwidget.setLayout(uplayout)
+
+        injectrow = QHBoxLayout()
+        injectrow.setContentsMargins(0, 0, 0, 0)
+        injectrow.setSpacing(4)
+        self.injectbox = QLineEdit()
+        self.injectbox.setPlaceholderText("Luau to inject...")
+        self.injectbox.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
+        self.injectbutton = QPushButton("Run")
+        self.injectbutton.setStyleSheet("QPushButton { color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px; } QPushButton:hover { background-color: #66d9ff; } QPushButton:pressed { background-color: #00a6e6; }")
+
+        injectrow.addWidget(self.injectbox)
+        injectrow.addWidget(self.injectbutton)
+
+        injectcopyrow = QHBoxLayout()
+        injectcopyrow.setContentsMargins(0, 0, 0, 0)
+        injectcopyrow.setSpacing(4)
+        self.injectcopybuttoncopy = QPushButton("Copy script")
+        self.injectcopybuttonpaste = QPushButton("Paste script")
+
+        injectcopyrow.addWidget(self.injectcopybuttoncopy)
+        injectcopyrow.addWidget(self.injectcopybuttonpaste)
+
+        self.injectstatus = QLabel("---")
+        self.injectstatus.setAlignment(Qt.AlignCenter)
+
+        uplayout.addLayout(injectrow)
+        uplayout.addLayout(injectcopyrow)
+        uplayout.addWidget(self.injectstatus)
+
+        tabslayout.addTab(upwidget, "Inject")
+
         mainlayout.addWidget(tabslayout)
 
         self.filechoose = QPushButton("Choose offset file (JSON)")
@@ -620,44 +663,32 @@ class Application(QWidget):
         except Exception:
             pass
         try:
-            self.executebox.textChanged.disconnect()
             self.executebox.returnPressed.disconnect()
-        except Exception:
-            pass
-        try:
             self.executebutton.clicked.disconnect()
         except Exception:
             pass
         try:
             self.spdtextbox.returnPressed.disconnect()
             self.spdbutton.clicked.disconnect()
-        except Exception:
-            pass
-        try:
             self.jumptextbox.returnPressed.disconnect()
             self.jumpbutton.clicked.disconnect()
-        except Exception:
-            pass
-        try:
             self.teleportcurrentbutton.clicked.disconnect()
             self.teleporttextboxX.returnPressed.disconnect()
             self.teleporttextboxY.returnPressed.disconnect()
             self.teleporttextboxZ.returnPressed.disconnect()
             self.teleportbutton.clicked.disconnect()
-        except Exception:
-            pass
-        try:
             self.teleportplayertextbox.returnPressed.disconnect()
             self.teleportplayerbutton.clicked.disconnect()
-        except Exception:
-            pass
-        try:
             self.noclipbutton.clicked.disconnect()
             self.notouchbutton.clicked.disconnect()
+            self.invisbutton.clicked.disconnect()
         except Exception:
             pass
         try:
-            self.invisbutton.clicked.disconnect()
+            self.injectbox.returnPressed.disconnect()
+            self.injectbutton.clicked.disconnect()
+            self.injectcopybuttoncopy.clicked.disconnect()
+            self.injectcopybuttonpaste.clicked.disconnect()
         except Exception:
             pass
 
@@ -1016,12 +1047,6 @@ class Application(QWidget):
             thread = threading.Thread(target=search)
             thread.start()
         
-        self.execute_globals = { "game": self.datamodel, "Vector3": Vector3, "Vector2": Vector2, "CFrame": CFrame }
-        self.execute_locals = {}
-
-        self.execute_history = []
-        self.execute_history_current = 0
-        
         def executeCode(text):
             if text == "": return
 
@@ -1230,6 +1255,64 @@ class Application(QWidget):
                         child.set_transparency(1.0)
             except:
                 pass
+
+        def injectGetScript():
+            try:
+                source = self.replicatedstorage.find_first_child("SourceModule")
+                self.inject_copiedbytecode = source.get_bytecode()
+
+                self.injectstatus.setText("Successfully copied bytecode from source script!")
+            except:
+                self.injectstatus.setText("Failed to get bytecode from source script!")
+                pass
+        def injectSetScript():
+            if len(self.inject_copiedbytecode) > 0:
+                try:
+                    starterplayer = self.datamodel.get_service("StarterPlayer")
+                    scriptcontext = self.datamodel.get_service("ScriptContext")
+
+                    vrnavigation = starterplayer.find_first_child("StarterPlayerScripts").find_first_child("PlayerModule").find_first_child("ControlModule").find_first_child("VRNavigation")
+                    playerlistmanager = self.datamodel.get_service("CoreGui").find_first_child("RobloxGui").find_first_child("Modules").find_first_child("PlayerList").find_first_child("PlayerListManager")
+
+                    scriptcontext.set_requirebypass(True)
+                    vrnavigation.set_bytecode(self.inject_copiedbytecode)
+                    playerlistmanager.spoofwith(vrnavigation)
+
+                    self.injectstatus.setText("Successfully injected bytecode into target script!")
+                except:
+                    self.injectstatus.setText("Failed to inject bytecode into target script!")
+
+        def injectLuau(luau):
+            if luau == "": return
+
+            script = '''
+                local module = {}
+
+                function module:HideTemp(_1, _2)
+                    ''' + luau + '''
+                end
+
+                return module
+            '''
+
+            compiler = Compiler()
+            status, bytecode = compiler.compile(script)
+
+            if status:
+                try:
+                    starterplayer = self.datamodel.get_service("StarterPlayer")
+                    scriptcontext = self.datamodel.get_service("ScriptContext")
+
+                    vrnavigation = starterplayer.StarterPlayerScripts.PlayerModule.ControlModule.VRNavigation
+                    playerlistmanager = self.datamodel.CoreGui.RobloxGui.Modules.PlayerList.PlayerListManager
+
+                    scriptcontext.set_requirebypass(True)
+                    vrnavigation.set_bytecode(bytecode)
+                    playerlistmanager.spoofwith(vrnavigation)
+
+                    self.injectstatus.setText("Successfully injected lua into target script!")
+                except:
+                    self.injectstatus.setText("Failed to inject lua into target script!")
         
         self.loadButton = loadButton
         self.showButton = showButton
@@ -1257,6 +1340,11 @@ class Application(QWidget):
         self.noclipbutton.clicked.connect(updateNoclipCollision)
         self.notouchbutton.clicked.connect(updateNoclipTouch)
         self.invisbutton.clicked.connect(updateInvisTransparency)
+
+        self.injectbox.returnPressed.connect(lambda : injectLuau(self.injectbox.text()))
+        self.injectbutton.clicked.connect(lambda : injectLuau(self.injectbox.text()))
+        self.injectcopybuttoncopy.clicked.connect(injectGetScript)
+        self.injectcopybuttonpaste.clicked.connect(injectSetScript)
 
         self.players = self.datamodel.get_service("Players")
         self.workspace = self.datamodel.get_service("Workspace")

@@ -11,7 +11,8 @@ packages = [
     "xxhash==3.6.0",
     "zstandard==0.25.0",
     "sip==6.13.1",
-    "dirtyjson==1.0.8"
+    "dirtyjson==1.0.8",
+    "blake3==1.0.8"
 ]
 
 if __name__ == '__main__':

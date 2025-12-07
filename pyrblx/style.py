@@ -74,17 +74,6 @@ BASE_VARIABLES = {
         "Subject": "get_subject",
         "FieldOfView": "get_fov"
     },
-    "BasePart": {
-        "Position": "get_position",
-        "Orientation": "get_rotation",
-        "Size": "get_size",
-        "CFrame": "get_cframe",
-        "Velocity": "get_velocity",
-        "Anchored": "get_anchored",
-        "CanCollide": "get_cancollide",
-        "CanTouch": "get_cantouch",
-        "Transparency": "get_transparency"
-    },
     "Part": {
         "Position": "get_position",
         "Orientation": "get_rotation",
@@ -123,10 +112,10 @@ BASE_VARIABLES = {
         "Value": "get_value"
     },
     "LocalScript": {
-        "Content": "get_content"
+        "Bytecode": "get_bytecode"
     },
     "ModuleScript": {
-        "Content": "get_content"
+        "Bytecode": "get_bytecode"
     },
     "Sound": {
         "SoundId": "get_soundid"
@@ -147,7 +136,6 @@ BASE_VARIABLES = {
 }
 
 BASE_ACTIONS = {
-    "BasePart": displayPosition,
     "Part": displayPosition,
     "MeshPart": displayPosition
 }
