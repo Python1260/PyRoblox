@@ -1,11 +1,11 @@
-import os
 import subprocess
+
 import struct
 from blake3 import blake3
 
-KEY_BYTES = bytes([0x01, 0x02, 0x03, 0x04])
-MAGIC_A = 0xAAAAAAAA
-MAGIC_B = 0x55555555
+KEY_BYTES = bytes([0x52, 0x4F, 0x46, 0x4C])
+MAGIC_A = 0x4C464F52
+MAGIC_B = 0x946AC432
 FOOTER_SIZE = 40
 
 def rotl8(value, shift):
@@ -15,21 +15,15 @@ def rotl8(value, shift):
 
 class Compiler():
     def __init__(self):
-        self.execname = "Luau/luau-compile.exe"
-        self.tempname = "temp.luau"
+        self.execname = "Luau/luau-compile-roblox.exe"
 
     def compile(self, luau):
-        with open(self.tempname, "w") as file:
-            file.write(luau)
-
         result = subprocess.run(
-            [self.execname, "--binary", self.tempname],
+            [self.execname, luau],
             capture_output=True,
             text=False
         )
         bytecode = result.stdout
-
-        os.remove(self.tempname)
 
         return result.returncode == 0, self.sign(bytecode)
     
