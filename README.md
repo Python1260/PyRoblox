@@ -15,6 +15,8 @@
   - *NEW* - Change your WalkSpeed and JumpPower in-game!
   - *NEW* - Teleport yourself to any position you want!
   - *NEW* - Disable your character's collision/damage from killbricks!
+  - ***EVEN NEWER*** - Inject and execute Luau code in-game!
+
 ---
 
 ## Usage
