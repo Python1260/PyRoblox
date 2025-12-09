@@ -1,6 +1,6 @@
 #  PyRoblox
 
-**PyRoblox** (`pyrblx`) is a tool made to explore **roblox's process memory** in an attempt to observe how the data is structured and managed in roblox games.
+**PyRoblox** (`pyrblx`) is an **external tool** made to explore **roblox's process memory** in an attempt to observe how the data is structured and managed in roblox games.
 > This tool is not intended for hacking! *(well it kinda is)*
 
 ---
