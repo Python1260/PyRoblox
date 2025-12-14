@@ -1124,17 +1124,6 @@ class ModuleScript(BaseScript):
 
         return self.set_data(data)
 
-    def unlockmodule(self):
-        mfoffset = self.memory.get_offset("ModuleFlags")
-        icpoffset = self.memory.get_offset("IsCoreScript")
-
-        success = True
-
-        success = success and self.memory.writeptr(self.address + mfoffset, 0x100000000)
-        success = success and self.memory.writeptr(self.address + icpoffset, 0x1)
-
-        return success
-
 class Sound(Instance):
     def __init__(self, memory, address):
         super().__init__(memory, address)

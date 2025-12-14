@@ -363,20 +363,28 @@ class Application(QWidget):
                 self.filechoose.setText("Please choose a valid .json file!")
     
     def handle_offsets(self):
-        if self.memory.process_find() == None: return
+        if self.memory.process_find() != None:
+            path = self.memory.process_find_path()
 
-        if "RobloxVersion" in self.memory.offsets:
-            version = os.path.basename(os.path.dirname(self.memory.process_find_path()))
+            if path:
+                if "RobloxVersion" in self.memory.offsets:
+                    version = os.path.basename(os.path.dirname(path))
 
-            if not version in self.memory.offsets["RobloxVersion"]:
-                self.warning.setText("WARNING: OFFSET AND ROBLOX VERSIONS DO NOT MATCH!")
-                self.warning.setStyleSheet("color: #b74b4b;")
+                    if not version in self.memory.offsets["RobloxVersion"]:
+                        self.warning.setText("WARNING: OFFSET AND ROBLOX VERSIONS DO NOT MATCH!")
+                        self.warning.setStyleSheet("color: #b74b4b;")
+                    else:
+                        self.warning.setText("You are up to date!")
+                        self.warning.setStyleSheet("color: #b0b0b0;")
+                else:
+                    self.warning.setText("WARNING: OFFSET VERSION NOT FOUND!")
+                    self.warning.setStyleSheet("color: #b74b4b;")
             else:
-                self.warning.setText("You are up to date!")
+                self.warning.setText("---")
                 self.warning.setStyleSheet("color: #b0b0b0;")
         else:
-            self.warning.setText("WARNING: OFFSET VERSION NOT FOUND!")
-            self.warning.setStyleSheet("color: #b74b4b;")
+            self.warning.setText("---")
+            self.warning.setStyleSheet("color: #b0b0b0;")
     
     def enable(self):
         self.enabled = True

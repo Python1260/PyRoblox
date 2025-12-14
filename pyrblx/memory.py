@@ -48,8 +48,7 @@ class Memory():
             json.dump(data, file, indent=1)
 
     def load_offsets_default(self):
-        self.offsets["ModuleFlags"] = "0x17c"
-        self.offsets["IsCoreScript"] = "0x180"
+        pass
     
     def load_offsets(self, offsetsfile=None):
         path = None

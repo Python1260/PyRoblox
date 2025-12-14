@@ -15,6 +15,9 @@ PACKAGES = [
     "blake3==1.0.8"
 ]
 
+environment = os.path.dirname(os.path.abspath(__file__))
+
+os.chdir(environment)
 os.system(f"pip install {' '.join(pckg for pckg in PACKAGES)}")
 
 from app import *
@@ -830,21 +833,15 @@ class Main(Application):
             if self.injecting: return
             if luau == "": return
 
-            script = '''
-                local module = {}
-
-                function module:HideTemp(_1, _2)
-                    ''' + luau + '''
-                end
-
-                return module
-            '''
-
             compiler = Compiler()
-            status, bytecode = compiler.compile(script)
+            script = "script.Parent=nil;task.spawn(function()" + luau + "\nend);while true do task.wait(9e9) end"
 
-            if status:
-                def inject():
+            def inject():
+                status, bytecode = compiler.compile(script)
+
+                if status:
+                    self.injectstatus.setText("Injecting...")
+
                     try:
                         starterplayer = self.datamodel.get_service("StarterPlayer")
                         scriptcontext = self.datamodel.get_service("ScriptContext")
@@ -853,31 +850,28 @@ class Main(Application):
                         playerlistmanager = self.datamodel.CoreGui.RobloxGui.Modules.PlayerList.PlayerListManager
 
                         if scriptcontext.requirebypass():
-                            if vrnavigation.unlockmodule():
-                                if vrnavigation.set_bytecode(bytecode):
-                                    playerlistmanager.spoofwith(vrnavigation)
-                                    time.sleep(0.5)
-                                    focus_until(self.memory.process.process_id, lambda : send_keys(VK_ESCAPE, VK_ESCAPE))
-                                    time.sleep(0.5)
-                                    playerlistmanager.spoofwith(playerlistmanager)
+                            if vrnavigation.set_bytecode(bytecode):
+                                playerlistmanager.spoofwith(vrnavigation)
+                                time.sleep(0.5)
+                                focus_until(self.memory.process.process_id, lambda : send_keys(VK_ESCAPE, VK_ESCAPE))
+                                time.sleep(0.5)
+                                playerlistmanager.spoofwith(playerlistmanager)
 
-                                    self.injectstatus.setText("Successfully injected luau into target script!")
-                                else:
-                                    self.injectstatus.setText("Failed to set bytecode of target script!")
+                                self.injectstatus.setText("Successfully injected luau into target script!")
                             else:
-                                self.injectstatus.setText("Failed to unlock module of target script!")
+                                self.injectstatus.setText("Failed to set bytecode of target script!")
                         else:
                             self.injectstatus.setText("Failed to require bypass!")
                     except Exception:
                         self.injectstatus.setText("Failed to inject luau into target script!")
-                    
-                    self.injecting = False
+                else:
+                    self.injectstatus.setText("Failed to compile luau!")
                 
-                threading.Thread(target=inject).start()
-                self.injecting = True
-                self.injectstatus.setText("Injecting...")
-            else:
-                self.injectstatus.setText("Failed to compile luau!")
+                self.injecting = False
+
+            threading.Thread(target=inject).start()
+            self.injecting = True
+            self.injectstatus.setText("Compiling...")
 
         self.searchbox.textChanged.connect(self.filterSearch)
         self.searchbox.returnPressed.connect(lambda : self.filterSearch(self.searchbox.text()))
