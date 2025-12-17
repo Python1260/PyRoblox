@@ -1,11 +1,18 @@
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QLabel, QPushButton, QScrollArea, QSizePolicy, QLineEdit, QFileDialog, QTabWidget, QTextEdit, QGraphicsOpacityEffect
-from PyQt5.QtCore import QTimer, Qt, QRect, pyqtSignal, QThread
-from PyQt5.QtGui import QFont, QPainter, QColor, QPen, QIntValidator
+from PyQt5.QtCore import QTimer, Qt, pyqtSignal
+from PyQt5.QtGui import QFont, QPainter, QPen, QIntValidator
 import sip
 
 import time
 
 from classes import BasePart
+
+def clearLayout(layout):
+    while layout.count():
+        item = layout.takeAt(0)
+        widget = item.widget()
+        if widget is not None:
+            widget.deleteLater()
 
 def getCFrame(app, obj):
     if not obj or not isinstance(obj, BasePart): return (-1, -1, -1, -1)

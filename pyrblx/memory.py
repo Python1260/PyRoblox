@@ -27,22 +27,41 @@ class Memory():
         self.process = None
         self.base = None
         self.scheduler = None
+        self.fastflags = None
 
         self.object_pool = {}
 
         self.offsets = {}
+        self.fflags = {}
+
+        self.offsets_link = "https://raw.githubusercontent.com/NtReadVirtualMemory/Roblox-Offsets-Website/main/offsets.json"
+        self.offsets_link_fallback = "https://raw.githubusercontent.com/Python1260/Roblox-Offsets-Website/main/offsets.json"
+        self.fflags_link = "https://raw.githubusercontent.com/NtReadVirtualMemory/Roblox-Offsets-Website/main/FFlags.hpp"
 
         self.load_offsets()
+        self.load_fflags()
 
     def download_offsets(self, target):
-        request = requests.get("https://raw.githubusercontent.com/NtReadVirtualMemory/Roblox-Offsets-Website/main/offsets.json")
+        request = requests.get(self.offsets_link)
+        request2 = requests.get(self.offsets_link_fallback)
+
         data = {}
+        data2 = {}
         
         if request and request.status_code == 200 and request.content:
-                try:
-                    data = dirtyjson.loads(request.text)
-                except Exception as e:
-                    pass
+            try:
+                data = dirtyjson.loads(request.text)
+            except Exception as e:
+                pass
+        
+        if request2 and request2.status_code == 200 and request2.content:
+            try:
+                data2 = dirtyjson.loads(request2.text)
+            except Exception as e:
+                pass
+        
+        if ("RobloxVersion" in data) and ("RobloxVersion" in data2) and (data["RobloxVersion"] == data2["RobloxVersion"]):
+            data = data2
         
         with open(target, 'w') as file:
             json.dump(data, file, indent=1)
@@ -64,6 +83,44 @@ class Memory():
 
         self.load_offsets_default()
     
+    def download_fflags(self, target):
+        request = requests.get(self.fflags_link)
+        data = {}
+        
+        if request and request.status_code == 200 and request.content:
+                try:
+                    flags = {}
+                    lines = request.text.replace(" ", "").split("\n")
+
+                    for line in lines:
+                        if line.startswith("uintptr_t"):
+                            name, value = line.removeprefix("uintptr_t").removesuffix(";").split("=")
+                            flags[name] = value
+
+                    data = flags
+                except Exception as e:
+                    pass
+        
+        with open(target, 'w') as file:
+            json.dump(data, file, indent=1)
+            
+    def load_fflags_default(self):
+        pass
+
+    def load_fflags(self, fflagsfile=None):
+        path = None
+
+        if fflagsfile != None:
+            path = fflagsfile
+        else:
+            path = os.path.join(self.app.path, 'FFlags.json')
+            self.download_fflags(path)
+
+        with open(path, 'r') as file:
+            self.fflags = json.load(file)
+
+        self.load_fflags_default()
+        
     def process_find(self, name=None):
         if name is None:
             name = self.target
@@ -94,6 +151,7 @@ class Memory():
             self.base = module.lpBaseOfDll
 
             self.scheduler = TaskScheduler(self)
+            self.fastflags = FastFlags(self)
 
             return True
         except Exception:
@@ -168,6 +226,10 @@ class Memory():
         )
 
     def get_offset(self, name):
+        string = self.offsets.get(name, "0x0")
+        return int(string, 16)
+
+    def get_fflag(self, name):
         string = self.offsets.get(name, "0x0")
         return int(string, 16)
 
@@ -470,3 +532,4 @@ class Memory():
             self.process = None
             self.base = None
             self.scheduler = None
+            self.fastflags = None

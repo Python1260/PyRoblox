@@ -82,6 +82,28 @@ class TaskScheduler():
         dmoffset = self.memory.get_offset("FakeDataModelToDataModel")
 
         return DataModel(self.memory, self.memory.readptr(fakedmaddr + dmoffset))
+
+class FastFlags():
+    def __init__(self, memory):
+        self.memory = memory
+    
+    def get_fflag(self, name):
+        try:
+            flag = self.memory.get_fflag(name)
+
+            return self.memory.readptr(self.memory.base + flag)
+        except Exception as e:
+            return False
+
+    def set_fflag(self, name, value):
+        if not self.memory:
+            return False
+        try:
+            flag = self.memory.get_fflag(name)
+
+            return self.memory.writeptr(self.memory.base + flag, value)
+        except Exception as e:
+            return False
     
 class Instance():
     def __init__(self, memory, address):

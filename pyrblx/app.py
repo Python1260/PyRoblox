@@ -9,17 +9,6 @@ from style import *
 
 APP_DATA = os.getenv("LOCALAPPDATA")
 
-def clearLayout(layout):
-    while layout.count():
-        item = layout.takeAt(0)
-        widget = item.widget()
-        if widget is not None:
-            widget.deleteLater()
-        else:
-            sub_layout = item.layout()
-            if sub_layout is not None:
-                clearLayout(sub_layout)
-
 class Overlay(QWidget):
     def __init__(self, app):
         super().__init__()
@@ -96,6 +85,9 @@ class Overlay(QWidget):
             del dots[owner]
         else:
             dots[owner] = dot
+    
+    def clear(self):
+        self.sections = {}
 
 class Application(QWidget):
     signal = pyqtSignal()
@@ -103,8 +95,8 @@ class Application(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.name = "Pyrblx"
-        self.version = 1.1
+        self.name = "Application"
+        self.version = 1.0
 
         self.maintimer = None
 
@@ -386,9 +378,7 @@ class Application(QWidget):
             self.warning.setText("---")
             self.warning.setStyleSheet("color: #b0b0b0;")
     
-    def enable(self):
-        self.enabled = True
-
+    def enable_worker(self):
         self.exitbtn.setText("Stop")
         self.exitbtn.setStyleSheet("background-color: #d13438; border: 1px solid #b12a2e; color: white; font-weight: 600;")
         self.exitbtn.clicked.disconnect()
@@ -401,14 +391,15 @@ class Application(QWidget):
         hide.setOpacity(0)
         self.filechoose.setDisabled(True)
         self.filechoose.setGraphicsEffect(hide)
-
-        self.message_set(["Loading", "▹ Loading", "▹▹ Loading..", "▹▹▻ Loading..."], 0.25)
     
-    def disable(self):
+    def enable(self):
         self.message_set(["Loading", "▹ Loading", "▹▹ Loading..", "▹▹▻ Loading..."], 0.25)
 
-        self.enabled = False
+        self.enabled = True
 
+        self.enable_worker()
+    
+    def disable_worker(self):
         self.initialized = False
 
         self.attempts = 0
@@ -418,10 +409,7 @@ class Application(QWidget):
         self.visualengine = None
 
         if self.overlay:
-            if self.overlay.maintimer: self.overlay.maintimer.stop()
-            self.overlay.close()
-        self.overlay = Overlay(self)
-        self.overlay.run()
+            self.overlay.clear()
 
         if self.memory:
             self.memory.close()
@@ -441,13 +429,17 @@ class Application(QWidget):
         self.dmlabel.setText("DataModel:        0x0")
         self.velabel.setText("VisualEngine:     0x0")
 
-        clearLayout(self.vrframe)
-        clearLayout(self.dtframe)
-
         show = QGraphicsOpacityEffect()
         show.setOpacity(1)
         self.filechoose.setDisabled(False)
         self.filechoose.setGraphicsEffect(show)
+    
+    def disable(self):
+        self.message_set(["Loading", "▹ Loading", "▹▹ Loading..", "▹▹▻ Loading..."], 0.25)
+
+        self.enabled = False
+
+        self.disable_worker()
 
         self.message_set(["▣ Stopped"])
     
@@ -482,6 +474,8 @@ class Application(QWidget):
                 elif self.attempts >= 10:
                     self.status.setText("Status:               Connection failed")
                     self.status.setStyleSheet("color: #ff4444; background-color: #2d2d2d; border-radius: 5px;")
+
+                    self.message_set(["✖ Failed"])
             return
         
         self.datamodel = self.memory.get_datamodel()

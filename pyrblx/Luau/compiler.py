@@ -17,18 +17,30 @@ def rotl8(value, shift):
 class Compiler():
 	def __init__(self, path="Luau/luau-compile-roblox.exe"):
 		self.execname = path
-		self.tempname = "temp.bin" 
+		self.tempname_write = "temp_write.lua"
+		self.tempname_read = "temp_read.bin"
+
+	def get_hook(self, name, version, pid, path="Luau/hooker.lua"):
+		with open(path) as file:
+			content = file.read()
+
+		return content.replace("%EXECUTOR_NAME%", name).replace("%EXECUTOR_VERSION%", str(version)).replace("%PROCESS_ID%", str(pid)) 
 
 	def compile(self, luau):
+		with open(self.tempname_write, "w") as file:
+			file.write(luau)
+
 		result = subprocess.run(
-			[self.execname, luau, self.tempname]
+			[self.execname, self.tempname_write, self.tempname_read]
 		)
+
+		remove(self.tempname_write)
 		
 		if result.returncode == 0:
-			with open(self.tempname, "rb") as file:
+			with open(self.tempname_read, "rb") as file:
 				bytecode = file.read()
 			
-			remove(self.tempname)
+			remove(self.tempname_read)
 			
 			return True, self.sign(bytecode)
 

@@ -12,7 +12,7 @@ PACKAGES = [
     "zstandard==0.25.0",
     "sip==6.13.1",
     "dirtyjson==1.0.8",
-    "blake3==1.0.8"
+    "websockets==15.0.1"
 ]
 
 environment = os.path.dirname(os.path.abspath(__file__))
@@ -23,12 +23,17 @@ os.system(f"pip install {' '.join(pckg for pckg in PACKAGES)}")
 from app import *
 from classes import Instance, BasePart
 from datatypes import *
+
 from Luau.compiler import Compiler
 from Luau.input import focus_until, send_keys, VK_ESCAPE
+from Luau.websocket import WebSocket, asyncio
 
 class Main(Application):
     def __init__(self):
         super().__init__()
+
+        self.name = "Pyrblx"
+        self.version = 2.0
 
         self.instance_buttons = {}
         self.instance_buttons_rev = {}
@@ -41,15 +46,19 @@ class Main(Application):
         self.searches_current = []
         self.searches_closedbuttons = []
 
+        self.websocket = WebSocket()
+        self.injecting = False
+
         self.execute_globals = { "game": self.datamodel, "Vector3": Vector3, "Vector2": Vector2, "CFrame": CFrame }
         self.execute_locals = {}
 
         self.execute_history = []
         self.execute_history_current = 0
-
-        self.injecting = False
     
     def init_ui(self):
+        self.name = "Pyrblx"
+        self.version = 2.0
+
         super().init_ui()
 
         rightlayout = QVBoxLayout()
@@ -91,35 +100,6 @@ class Main(Application):
         rightlayout.addWidget(vrscroll)
 
         self.tabslayout.addTab(rightwidget, "Instances")
-
-        toplayout = QVBoxLayout()
-        topwidget = QWidget()
-        topwidget.setLayout(toplayout)
-
-        row = QHBoxLayout()
-        row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(4)
-
-        self.executebox = QLineEdit()
-        self.executebox.setPlaceholderText("Code to execute…")
-        self.executebox.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
-
-        self.executebutton = QPushButton("Run")
-        self.executebutton.setStyleSheet("QPushButton { color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px; } QPushButton:hover { background-color: #66d9ff; } QPushButton:pressed { background-color: #00a6e6; }")
-
-        row.addWidget(self.executebox)
-        row.addWidget(self.executebutton)
-
-        toplayout.addLayout(row)
-
-        self.executeresult = QTextEdit("> Pyrblx is running...")
-        self.executeresult.setReadOnly(True)
-        self.executeresult.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
-        self.executeresult.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-        toplayout.addWidget(self.executeresult)
-
-        self.tabslayout.addTab(topwidget, "Execute")
 
         downlayout = QVBoxLayout()
         downwidget = QWidget()
@@ -238,7 +218,7 @@ class Main(Application):
         injectrow.setSpacing(4)
         self.injectbox = QTextEdit()
         self.injectbox.setPlaceholderText("Luau to inject...")
-        self.injectbox.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
+        self.injectbox.setStyleSheet("QTextEdit { font-family: Consolas, 'JetBrains Mono', monospace; color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px; }")
         self.injectcopybutton = QPushButton("Load from file")
         
         injectrow.addWidget(self.injectbox)
@@ -254,6 +234,35 @@ class Main(Application):
         uplayout.addWidget(self.injectstatus)
 
         self.tabslayout.addTab(upwidget, "Inject")
+
+        toplayout = QVBoxLayout()
+        topwidget = QWidget()
+        topwidget.setLayout(toplayout)
+
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(4)
+
+        self.executebox = QLineEdit()
+        self.executebox.setPlaceholderText("Code to execute…")
+        self.executebox.setStyleSheet("QLineEdit { font-family: Consolas, 'JetBrains Mono', monospace; color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px; }")
+
+        self.executebutton = QPushButton("Run")
+        self.executebutton.setStyleSheet("QPushButton { color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px; } QPushButton:hover { background-color: #66d9ff; } QPushButton:pressed { background-color: #00a6e6; }")
+
+        row.addWidget(self.executebox)
+        row.addWidget(self.executebutton)
+
+        toplayout.addLayout(row)
+
+        self.executeresult = QTextEdit("> Pyrblx is running...")
+        self.executeresult.setReadOnly(True)
+        self.executeresult.setStyleSheet("QTextEdit { font-family: Consolas, 'JetBrains Mono', monospace; color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px; }")
+        self.executeresult.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        toplayout.addWidget(self.executeresult)
+
+        self.tabslayout.addTab(topwidget, "Execute")
     
     def init_hotkeys(self):
         if not self.registered:
@@ -271,18 +280,25 @@ class Main(Application):
 
             super().init_hotkeys()
     
-    def enable(self):
-        super().enable()
+    def closeEvent(self, event):
+        threading.Thread(target=self.websocket.stop, daemon=False).start()
 
-    def disable(self):
+        super().closeEvent(event)
+    
+    def enable_worker(self):
+        super().enable_worker()
+
+        threading.Thread(target=self.websocket.start, daemon=False).start()
+
+    def disable_worker(self):
+        super().disable_worker()
+
+        clearLayout(self.vrframe)
+        clearLayout(self.dtframe)
+
         try:
             self.searchbox.textChanged.disconnect()
             self.searchbox.returnPressed.disconnect()
-        except Exception:
-            pass
-        try:
-            self.executebox.returnPressed.disconnect()
-            self.executebutton.clicked.disconnect()
         except Exception:
             pass
         try:
@@ -307,8 +323,13 @@ class Main(Application):
             self.injectbutton.clicked.disconnect()
         except Exception:
             pass
-
-        super().disable()
+        try:
+            self.executebox.returnPressed.disconnect()
+            self.executebutton.clicked.disconnect()
+        except Exception:
+            pass
+    
+        threading.Thread(target=self.websocket.stop, daemon=False).start()
         
     def loadButton(self, obj, parent, strictchildren=None):
         objname = obj.get_name()
@@ -589,38 +610,17 @@ class Main(Application):
 
         self.selected_instance = None
         self.selected_variables = {}
-        self.base_variables = BASE_VARIABLES
-        self.base_actions = BASE_ACTIONS
 
         self.searches_current = []
         self.searches_closedbuttons = []
+
+        self.injecting = False
 
         self.execute_globals = { "game": self.datamodel, "Vector3": Vector3, "Vector2": Vector2, "CFrame": CFrame }
         self.execute_locals = {}
 
         self.execute_history = []
         self.execute_history_current = 0
-
-        self.injecting = False
-        
-        def executeCode(text):
-            if text == "": return
-
-            self.execute_history = self.execute_history[self.execute_history_current:len(self.execute_history)]
-            self.execute_history.insert(0, text)
-            self.execute_history_current = 0
-
-            try:
-                value = str(eval(text, self.execute_globals, self.execute_locals))
-            except Exception:
-                try:
-                    value = str(exec(text, self.execute_globals, self.execute_locals))
-                except Exception as error:
-                    value = str(error)
-
-            self.executebox.setText("")
-            self.executeresult.setText(f"> {value}\n{self.executeresult.toPlainText()}")
-            return value
         
         def updateEspDots():
                 while self.enabled:
@@ -834,50 +834,114 @@ class Main(Application):
             if luau == "": return
 
             compiler = Compiler()
-            script = "script.Parent=nil;task.spawn(function()" + luau + "\nend);while true do task.wait(9e9) end"
 
-            def inject():
-                status, bytecode = compiler.compile(script)
+            async def inject():
+                robloxreplicatedstorage = self.datamodel.get_service("RobloxReplicatedStorage")
 
-                if status:
-                    self.injectstatus.setText("Injecting...")
+                if not robloxreplicatedstorage.find_first_child(self.name):
+                    hook = compiler.get_hook(self.name, self.version, self.memory.process.process_id)
+                    script = "script.Parent=nil;task.spawn(function()" + hook + "\nend);while true do task.wait(9e9) end"
 
-                    try:
-                        starterplayer = self.datamodel.get_service("StarterPlayer")
-                        scriptcontext = self.datamodel.get_service("ScriptContext")
+                    status, bytecode = compiler.compile(script)
 
-                        vrnavigation = starterplayer.StarterPlayerScripts.PlayerModule.ControlModule.VRNavigation
-                        playerlistmanager = self.datamodel.CoreGui.RobloxGui.Modules.PlayerList.PlayerListManager
+                    if status:
+                        self.injectstatus.setText("Injecting hook...")
 
-                        if scriptcontext.requirebypass():
-                            if vrnavigation.set_bytecode(bytecode):
-                                playerlistmanager.spoofwith(vrnavigation)
-                                time.sleep(0.5)
-                                focus_until(self.memory.process.process_id, lambda : send_keys(VK_ESCAPE, VK_ESCAPE))
-                                time.sleep(0.5)
-                                playerlistmanager.spoofwith(playerlistmanager)
+                        try:
+                            starterplayer = self.datamodel.get_service("StarterPlayer")
+                            scriptcontext = self.datamodel.get_service("ScriptContext")
+                            coregui = self.datamodel.get_service("CoreGui")
 
-                                self.injectstatus.setText("Successfully injected luau into target script!")
+                            vrnavigation = starterplayer.find_first_child("StarterPlayerScripts").find_first_child("PlayerModule").find_first_child("ControlModule").find_first_child("VRNavigation")
+                            playerlistmanager = coregui.find_first_child("RobloxGui").find_first_child("Modules").find_first_child("PlayerList").find_first_child("PlayerListManager")
+
+                            self.memory.fastflags.set_fflag("WebSocketServiceEnableClientCreation", True)
+
+                            if scriptcontext.requirebypass():
+                                if vrnavigation.set_bytecode(bytecode):
+                                    playerlistmanager.spoofwith(vrnavigation)
+                                    time.sleep(0.5)
+                                    focus_until(self.memory.process.process_id, lambda : send_keys(VK_ESCAPE, VK_ESCAPE))
+                                    time.sleep(0.5)
+                                    playerlistmanager.spoofwith(playerlistmanager)
+
+                                    self.injectstatus.setText("Successfully injected hook into target script!")
+                                else:
+                                    self.injectstatus.setText("Failed to set bytecode of target script!")
                             else:
-                                self.injectstatus.setText("Failed to set bytecode of target script!")
-                        else:
-                            self.injectstatus.setText("Failed to require bypass!")
-                    except Exception:
-                        self.injectstatus.setText("Failed to inject luau into target script!")
+                                self.injectstatus.setText("Failed to require bypass!")
+                        except Exception:
+                            self.injectstatus.setText("Failed to inject hook into target script!")
+                    else:
+                        self.injectstatus.setText("Failed to compile hook!")
+                
+                self.injectstatus.setText("Connecting to hook...")
+
+                responses = await self.websocket.broadcast(action="getModule")
+
+                if len(responses) == 0:
+                    self.injectstatus.setText("Failed connecting to hook!")
                 else:
-                    self.injectstatus.setText("Failed to compile luau!")
+                    script = "script.Parent=nil;task.spawn(function()" + luau + "\nend);return {}"
+
+                    status, bytecode = compiler.compile(script)
+
+                    if status:
+                        self.injectstatus.setText("Injecting...")
+
+                        for ws, data in responses:
+                            try:
+                                module = robloxreplicatedstorage.find_first_child(self.name).find_first_child("Scripts").find_first_child(data)
+
+                                if module:
+                                    if module.set_bytecode(bytecode):
+                                        self.injectstatus.setText("Sending require request...")
+
+                                        responses2 = await self.websocket.broadcast(action="requireModule", data=module.get_name(), target=ws)
+
+                                        for _, data in responses2:
+                                            pass
+                                                
+                                        self.injectstatus.setText("Successfully injected luau into target script!")
+                                    else:
+                                        self.injectstatus.setText("Failed to set bytecode of target script!")
+                                else:
+                                    self.injectstatus.setText("Target script not found!")
+                            except Exception:
+                                self.injectstatus.setText("Failed to inject luau into target script!")
+                    else:
+                        self.injectstatus.setText("Failed to compile luau!")
                 
                 self.injecting = False
+            
+            def run_inject():
+                asyncio.run(inject())
 
-            threading.Thread(target=inject).start()
             self.injecting = True
+            threading.Thread(target=run_inject, daemon=True).start()
             self.injectstatus.setText("Compiling...")
+        
+        def executeCode(text):
+            if text == "": return
+
+            self.execute_history = self.execute_history[self.execute_history_current:len(self.execute_history)]
+            self.execute_history.insert(0, text)
+            self.execute_history_current = 0
+
+            try:
+                value = str(eval(text, self.execute_globals, self.execute_locals))
+            except Exception:
+                try:
+                    value = str(exec(text, self.execute_globals, self.execute_locals))
+                except Exception as error:
+                    value = str(error)
+
+            self.executebox.setText("")
+            self.executeresult.setText(f"> {value}\n{self.executeresult.toPlainText()}")
+            return value
 
         self.searchbox.textChanged.connect(self.filterSearch)
         self.searchbox.returnPressed.connect(lambda : self.filterSearch(self.searchbox.text()))
-
-        self.executebox.returnPressed.connect(lambda : executeCode(self.executebox.text()))
-        self.executebutton.clicked.connect(lambda : executeCode(self.executebox.text()))
 
         self.spdtextbox.returnPressed.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
         self.spdbutton.clicked.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
@@ -896,6 +960,9 @@ class Main(Application):
 
         self.injectcopybutton.clicked.connect(injectGetFromFile)
         self.injectbutton.clicked.connect(lambda : injectLuau(self.injectbox.toPlainText()))
+
+        self.executebox.returnPressed.connect(lambda : executeCode(self.executebox.text()))
+        self.executebutton.clicked.connect(lambda : executeCode(self.executebox.text()))
 
         self.players = self.datamodel.get_service("Players")
         self.workspace = self.datamodel.get_service("Workspace")
