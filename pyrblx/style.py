@@ -45,7 +45,7 @@ def displayPosition(app, obj):
                 unselectedinfolayout = unselectedinfo.layout()
                 unselectedname = unselectedinfolayout.itemAt(unselectedinfolayout.count() - 1).widget()
                 unselectedname.setStyleSheet(f"color: {"#b0b0b0"}; background-color: #2d2d2d; border-radius: 3px; padding: 5px; text-align: left;")
-
+                
 BASE_VARIABLES = {
     "DataModel": {
         "CreatorId": "get_creatorid",

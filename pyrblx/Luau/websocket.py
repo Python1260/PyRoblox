@@ -3,6 +3,7 @@ import json
 import uuid
 
 import websockets
+import threading
 
 class WebSocket():
     def __init__(self, host="localhost", port=8080):
@@ -14,6 +15,7 @@ class WebSocket():
 
         self.requests = {}
 
+        self.thread = None
         self.loop = None
     
     async def handler(self, websocket):
@@ -77,18 +79,39 @@ class WebSocket():
         return responses
     
     async def start_async(self):
-        if self.server == None:
-            self.server = await websockets.serve(
-                self.handler,
-                self.host,
-                self.port
-            )
+        if self.server:
+            return
+
+        self.server = await websockets.serve(
+            self.handler,
+            self.host,
+            self.port
+        )
     
     def start(self):
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-        self.loop.run_until_complete(self.start_async())
-        self.loop.run_forever()
+        if self.thread and self.thread.is_alive():
+            return
+        
+        def worker():
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+
+            self.loop.run_until_complete(self.start_async())
+            self.loop.run_forever()
+
+            pending = asyncio.all_tasks(self.loop)
+            for task in pending:
+                task.cancel()
+            
+            self.loop.run_until_complete(
+                asyncio.gather(*pending)
+            )
+
+            self.loop.close()
+            self.loop = None
+        
+        self.thread = threading.Thread(target=worker, daemon=True)
+        self.thread.start()
     
     async def stop_async(self):
         for client in list(self.clients):
@@ -109,3 +132,6 @@ class WebSocket():
             return
 
         asyncio.run_coroutine_threadsafe(self.stop_async(), self.loop)
+
+        self.thread.join()
+        self.thread = None

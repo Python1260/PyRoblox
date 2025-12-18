@@ -18,8 +18,14 @@ PAGE_EXECUTE_READWRITE = 0x40
 PAGE_READWRITE = 0x04
 MEM_COMMIT = 0x1000
 
+OFFSETS = {}
+FFLAGS = {}
+
 class Memory():
     def __init__(self, app):
+        global OFFSETS
+        global FFLAGS
+
         self.app = app
 
         self.target = "RobloxPlayerBeta.exe"
@@ -31,8 +37,8 @@ class Memory():
 
         self.object_pool = {}
 
-        self.offsets = {}
-        self.fflags = {}
+        self.offsets = OFFSETS
+        self.fflags = FFLAGS
 
         self.offsets_link = "https://raw.githubusercontent.com/NtReadVirtualMemory/Roblox-Offsets-Website/main/offsets.json"
         self.offsets_link_fallback = "https://raw.githubusercontent.com/Python1260/Roblox-Offsets-Website/main/offsets.json"
@@ -42,8 +48,12 @@ class Memory():
         self.load_fflags()
 
     def download_offsets(self, target):
-        request = requests.get(self.offsets_link)
-        request2 = requests.get(self.offsets_link_fallback)
+        try:
+            request = requests.get(self.offsets_link)
+            request2 = requests.get(self.offsets_link_fallback)
+        except:
+            request = None
+            request2 = None
 
         data = {}
         data2 = {}
@@ -70,6 +80,9 @@ class Memory():
         pass
     
     def load_offsets(self, offsetsfile=None):
+        global OFFSETS
+        if len(self.offsets) > 0: return
+
         path = None
 
         if offsetsfile != None:
@@ -82,9 +95,15 @@ class Memory():
             self.offsets = json.load(file)
 
         self.load_offsets_default()
+
+        OFFSETS = self.offsets
     
     def download_fflags(self, target):
-        request = requests.get(self.fflags_link)
+        try:
+            request = requests.get(self.fflags_link)
+        except:
+            request = None
+
         data = {}
         
         if request and request.status_code == 200 and request.content:
@@ -108,6 +127,9 @@ class Memory():
         pass
 
     def load_fflags(self, fflagsfile=None):
+        global FFLAGS
+        if len(self.fflags) > 0: return
+
         path = None
 
         if fflagsfile != None:
@@ -120,6 +142,8 @@ class Memory():
             self.fflags = json.load(file)
 
         self.load_fflags_default()
+
+        FFLAGS = self.fflags
         
     def process_find(self, name=None):
         if name is None:

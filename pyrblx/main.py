@@ -35,6 +35,12 @@ class Main(Application):
         self.name = "Pyrblx"
         self.version = 2.0
 
+        self.init_queue = []
+
+        self.players = None
+        self.workspace = None
+        self.replicatedstorage = None
+
         self.instance_buttons = {}
         self.instance_buttons_rev = {}
 
@@ -77,13 +83,15 @@ class Main(Application):
 
         dtwidget = QWidget()
         dtwidget.setStyleSheet("background-color: #2d2d2d;")
-
         self.dtframe = QVBoxLayout(dtwidget)
         self.dtframe.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.dtframe.setSpacing(5)
 
         dtscroll.setWidget(dtwidget)
         rightlayout.addWidget(dtscroll)
+
+        self.refreshbutton = QPushButton("Refresh")
+        rightlayout.addWidget(self.refreshbutton)
 
         vrscroll = QScrollArea(self)
         vrscroll.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-radius: 0px;")
@@ -281,14 +289,14 @@ class Main(Application):
             super().init_hotkeys()
     
     def closeEvent(self, event):
-        threading.Thread(target=self.websocket.stop, daemon=False).start()
+        self.websocket.stop()
 
         super().closeEvent(event)
     
     def enable_worker(self):
         super().enable_worker()
 
-        threading.Thread(target=self.websocket.start, daemon=False).start()
+        self.websocket.start()
 
     def disable_worker(self):
         super().disable_worker()
@@ -299,6 +307,7 @@ class Main(Application):
         try:
             self.searchbox.textChanged.disconnect()
             self.searchbox.returnPressed.disconnect()
+            self.refreshbutton.clicked.disconnect()
         except Exception:
             pass
         try:
@@ -329,8 +338,29 @@ class Main(Application):
         except Exception:
             pass
     
-        threading.Thread(target=self.websocket.stop, daemon=False).start()
-        
+        self.websocket.stop()
+    
+    def init_queue_insert(self, obj, parent, strictchildren=None, parentinstance=None, parentname=""):
+        self.init_queue.append({
+            "parent": {
+                "instance": parentinstance,
+                "name": parentname
+            },
+            "args": {
+                "obj": obj,
+                "parent": parent,
+                "strictchildren": strictchildren
+            }
+        })
+    
+    def init_queue_update(self):
+        if len(self.init_queue) > 0:
+            elem = self.init_queue.pop()
+            self.loadButton(**elem["args"])
+
+            if elem["parent"]["instance"]:
+                elem["parent"]["instance"].setText(elem["parent"]["name"])
+
     def loadButton(self, obj, parent, strictchildren=None):
         objname = obj.get_name()
         objclass = obj.get_class()
@@ -379,71 +409,22 @@ class Main(Application):
         self.instance_buttons[obj] = main_widget
         self.instance_buttons_rev[main_widget] = obj
 
-        for idx, child in enumerate(objchildren):
-            if not self.enabled: break
-
-            name.setText(f"{objname} ({objclass})    LOADING {(idx + 1)}/{len(objchildren)}")
-            self.loadButton(child, container_layout)
-            QApplication.processEvents()
-            
-        name.setText(f"{objname} ({objclass})")
+        nametext = f"{objname} ({objclass})"
+        name.setText(nametext)
         name.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-radius: 3px; padding: 5px; text-align: left;")
+
+        childrenlength = len(objchildren)
+
+        for idx, child in enumerate(reversed(objchildren)):
+            pn = nametext if idx == 0 else f"{nametext}    >LOADING {childrenlength - idx}/{childrenlength}<"
+            self.init_queue_insert(child, container_layout, parentinstance=name, parentname=pn)
 
         if not self.testSearch(self.searchbox.text(), obj):
             main_widget.hide()
             container_widget.hide()
             if button and button.text() == "▼": button.setText("►")
-                
-            return main_widget
-        
-    def deleteButton(self, obj):
-        if obj in self.instance_buttons:
-            button = self.instance_buttons[obj]
-                
-            if not sip.isdeleted(button):
-                button.deleteLater()
 
-            del self.instance_buttons[obj]
-            del self.instance_buttons_rev[button]
-        
-    def updateButton(self, obj, prev_list):
-        objdescendants = self.get_descendants_fast(obj)
-
-        for child in objdescendants:
-            if not self.enabled: break
-            
-            if not child in prev_list:
-                childparent = child.get_parent()
-
-                if childparent in self.instance_buttons:
-                    parentbutton = self.instance_buttons[childparent]
-
-                    if not sip.isdeleted(parentbutton):
-                        parentbuttonlayout = parentbutton.layout()
-                        parentcontainer = parentbuttonlayout.itemAt(1).widget()
-                        parentcontainerlayout = parentcontainer.layout()
-                            
-                        self.loadButton(child, parentcontainerlayout)
-            else:
-                if child in self.instance_buttons:
-                    childbutton = self.instance_buttons[child]
-
-                    if not sip.isdeleted(childbutton):
-                        childbuttonlayout = childbutton.layout()
-                        childinfo = childbuttonlayout.itemAt(0).widget()
-                        childinfolayout = childinfo.layout()
-                        childname = childinfolayout.itemAt(childinfolayout.count() - 1).widget()
-                            
-                        childname.setText(f"{child.get_name()} ({child.get_class()})")
-
-            QApplication.processEvents()
-            
-        for child in prev_list:
-            if not child in objdescendants:
-                self.deleteButton(child)
-            QApplication.processEvents()
-
-        return objdescendants
+        return main_widget
         
     def showButton(self, button, container, visible):
         if isinstance(button, QPushButton):
@@ -530,18 +511,6 @@ class Main(Application):
 
         mbutton.setText(str(value))
         
-    def get_descendants_fast(self, obj):
-        descendants = []
-
-        objchildren = obj.get_children()
-
-        for child in objchildren:
-            descendants.append(child)
-            descendants += self.get_descendants_fast(child)
-            QApplication.processEvents()
-
-        return descendants
-        
     def testSearch(self, text, obj):
         stext = text.lower().split(" ")
         cname = f"{obj.get_name().lower()} {obj.get_class().lower()} {obj.get_address()}"
@@ -621,57 +590,67 @@ class Main(Application):
 
         self.execute_history = []
         self.execute_history_current = 0
+
+        def updateInstancesRefresh():
+            clearLayout(self.vrframe)
+            clearLayout(self.dtframe)
+
+            self.selected_instance = None
+            self.selected_variables = {}
+
+            self.init_queue = []
+            self.init_queue_insert(self.datamodel, self.dtframe, [self.players, self.workspace, self.replicatedstorage])
         
         def updateEspDots():
-                while self.enabled:
-                    section = self.overlay.sections[self.overlay_section_esp]
+            while self.enabled:
+                section = self.overlay.sections[self.overlay_section_esp]
 
-                    if self.espbox.isChecked():
-                        try:
-                            localplayer = self.players.get_localplayer()
-                            if not localplayer: continue
-                            playerchildren = self.players.get_children()
-                            espdots = section.copy()
+                if self.espbox.isChecked():
+                    try:
+                        localplayer = self.players.get_localplayer()
+                        if not localplayer: continue
+                        playerchildren = self.players.get_children()
+                        espdots = section.copy()
 
-                            for owner, dot in espdots.items():
-                                if not owner in playerchildren:
-                                    self.overlay.addDot(self.overlay_section_esp, owner, False)
+                        for owner, dot in espdots.items():
+                            if not owner in playerchildren:
+                                self.overlay.addDot(self.overlay_section_esp, owner, False)
 
-                            for child in playerchildren:
-                                if child == localplayer: continue
+                        for child in playerchildren:
+                            if child == localplayer: continue
 
-                                if not child in espdots:
-                                    character = child.get_character()
-                                    if not character: continue
-                                    root = character.find_first_child("HumanoidRootPart")
-                                    if not root: continue
+                            if not child in espdots:
+                                character = child.get_character()
+                                if not character: continue
+                                root = character.find_first_child("HumanoidRootPart")
+                                if not root: continue
 
-                                    self.overlay.addDot(self.overlay_section_esp, child, lambda r=root: getCFrame(self, r))
-                        except:
-                            self.overlay.sections[self.overlay_section_esp] = {}
-                    else:
-                        if len(section) > 0:
-                            self.overlay.sections[self.overlay_section_esp] = {}
+                                self.overlay.addDot(self.overlay_section_esp, child, lambda r=root: getCFrame(self, r))
+                    except:
+                        self.overlay.sections[self.overlay_section_esp] = {}
+                else:
+                    if len(section) > 0:
+                        self.overlay.sections[self.overlay_section_esp] = {}
 
-                    time.sleep(0)
+                time.sleep(1 / self.fps)
         
         def updateFlyVelocity():
-                while self.enabled:
-                    if self.flybox.isChecked():
-                        try:
-                            localplayer = self.players.get_localplayer()
-                            if not localplayer: continue
-                            character = localplayer.get_character()
-                            if not character: continue
-                            root = character.find_first_child("HumanoidRootPart")
-                            if not root: continue
+            while self.enabled:
+                if self.flybox.isChecked():
+                    try:
+                        localplayer = self.players.get_localplayer()
+                        if not localplayer: continue
+                        character = localplayer.get_character()
+                        if not character: continue
+                        root = character.find_first_child("HumanoidRootPart")
+                        if not root: continue
 
-                            vel = Vector3(0.0, 500.0, 0.0)
-                            root.set_velocity(vel)
-                        except:
-                            pass
+                        vel = Vector3(0.0, 500.0, 0.0)
+                        root.set_velocity(vel)
+                    except:
+                        pass
                     
-                    time.sleep(0)
+                time.sleep(1 / self.fps)
         
         def updateSpdWalkSpeed(text):
             if text == "": return
@@ -739,7 +718,7 @@ class Main(Application):
                     root.set_cframe(newcframe)
                     root.set_position(newpos)
                     root.set_velocity(newvel)
-                    time.sleep(0)
+                    time.sleep(1 / self.fps)
             except:
                 pass
         
@@ -769,7 +748,7 @@ class Main(Application):
                     root.set_cframe(newcframe)
                     root.set_position(newpos)
                     root.set_velocity(newvel)
-                    time.sleep(0)
+                    time.sleep(1 / self.fps)
             except:
                 pass
         
@@ -942,6 +921,7 @@ class Main(Application):
 
         self.searchbox.textChanged.connect(self.filterSearch)
         self.searchbox.returnPressed.connect(lambda : self.filterSearch(self.searchbox.text()))
+        self.refreshbutton.clicked.connect(updateInstancesRefresh)
 
         self.spdtextbox.returnPressed.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
         self.spdbutton.clicked.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
@@ -971,16 +951,12 @@ class Main(Application):
         threading.Thread(target=updateEspDots).start()
         threading.Thread(target=updateFlyVelocity).start()
 
-        self.loadButton(self.datamodel, self.dtframe, [self.players, self.workspace, self.replicatedstorage])
+        self.init_queue_insert(self.datamodel, self.dtframe, [self.players, self.workspace, self.replicatedstorage])
 
-        self.workspace_prevchildren = self.get_descendants_fast(self.workspace)
-        self.replicatedstorage_prevchildren = self.get_descendants_fast(self.replicatedstorage)
-        self.players_prevchildren = self.get_descendants_fast(self.players)
+        self.initialization_finished = True
     
     def onStep(self):
-        self.players_prevchildren = self.updateButton(self.players, self.players_prevchildren)
-        self.workspace_prevchildren = self.updateButton(self.workspace, self.workspace_prevchildren)
-        self.replicatedstorage_prevchildren = self.updateButton(self.replicatedstorage, self.replicatedstorage_prevchildren)
+        self.init_queue_update()
 
         if self.selected_instance != None:
             if not self.selected_instance.get_parent():

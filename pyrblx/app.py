@@ -102,7 +102,8 @@ class Application(QWidget):
 
         self.running = True
         self.enabled = False
-        self.initialized = False
+        self.initialization = False
+        self.initialization_finished = False
         self.timer = 0
         self.fps = 60
 
@@ -312,7 +313,8 @@ class Application(QWidget):
         self.running = False
         self.enabled = False
 
-        self.initialized = False
+        self.initialization = False
+        self.initialization_finished = False
 
         self.attempts = 0
         self.retry = 0
@@ -348,6 +350,7 @@ class Application(QWidget):
 
         if file:
             try:
+                self.memory.offsets = {}
                 self.memory.load_offsets(file)
                 self.handle_offsets()
                 self.filechoose.setText(f"Offset file: {os.path.basename(file)}")
@@ -393,6 +396,8 @@ class Application(QWidget):
         self.filechoose.setGraphicsEffect(hide)
     
     def enable(self):
+        if self.enabled: return
+
         self.message_set(["Loading", "▹ Loading", "▹▹ Loading..", "▹▹▻ Loading..."], 0.25)
 
         self.enabled = True
@@ -400,7 +405,8 @@ class Application(QWidget):
         self.enable_worker()
     
     def disable_worker(self):
-        self.initialized = False
+        self.initialization = False
+        self.initialization_finished = False
 
         self.attempts = 0
         self.retry = 0
@@ -435,6 +441,8 @@ class Application(QWidget):
         self.filechoose.setGraphicsEffect(show)
     
     def disable(self):
+        if not self.enabled: return
+
         self.message_set(["Loading", "▹ Loading", "▹▹ Loading..", "▹▹▻ Loading..."], 0.25)
 
         self.enabled = False
@@ -486,17 +494,19 @@ class Application(QWidget):
 
         if self.datamodel and self.visualengine:
             try:
-                if not self.initialized:
-                    self.initialized = True
+                if not self.initialization:
+                    self.initialization = True
                     self.message_set(["›  Running", "➤ Running"])
+                
+                if self.initialization and not self.initialization_finished:
                     self.onInit()
-
-                self.onStep()
+                else:
+                    self.onStep()
             except Exception as e:
                 self.disable()
         
     def onInit(self):
-        pass
+        self.initialization_finished = True
 
     def onStep(self):
         pass
