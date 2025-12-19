@@ -36,10 +36,12 @@ class WebSocket():
                                     fut.set_result,
                                     (websocket, data["data"])
                                 )
+        except asyncio.CancelledError:
+            pass
         except websockets.ConnectionClosed:
             pass
         finally:
-            self.clients.remove(websocket)
+            self.clients.discard(websocket)
     
     async def broadcast(self, action, data=None, timeout=5, target=None):
         if data is None: data = {}
@@ -104,7 +106,7 @@ class WebSocket():
                 task.cancel()
             
             self.loop.run_until_complete(
-                asyncio.gather(*pending)
+                asyncio.gather(*pending, return_exceptions=True)
             )
 
             self.loop.close()
@@ -115,12 +117,11 @@ class WebSocket():
     
     async def stop_async(self):
         for client in list(self.clients):
-            await client.close()
+            client.close()
         self.clients = set()
         
         if self.server:
             self.server.close()
-            await self.server.wait_closed()
         self.server = None
 
         self.requests = {}
@@ -132,6 +133,5 @@ class WebSocket():
             return
 
         asyncio.run_coroutine_threadsafe(self.stop_async(), self.loop)
-
-        self.thread.join()
+        
         self.thread = None

@@ -87,7 +87,7 @@ class Overlay(QWidget):
             dots[owner] = dot
     
     def clear(self):
-        self.sections = {}
+        self.sections.clear()
 
 class Application(QWidget):
     signal = pyqtSignal()

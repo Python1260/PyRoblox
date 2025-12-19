@@ -76,12 +76,23 @@ class TaskScheduler():
         return ve
 
     def get_datamodel(self):
-        fakedmoffset = self.memory.get_offset("FakeDataModelPointer")
-        fakedmaddr = self.memory.readptr(self.memory.base + fakedmoffset)
+        job = self.get_job("RenderJob")
+
+        offset = self.memory.get_offset("RenderJobToFakeDataModel")
+        fakedmaddr = self.memory.readptr(job + offset)
+
+        if fakedmaddr == 0:
+            fakedmoffset = self.memory.get_offset("FakeDataModelPointer")
+            fakedmaddr = self.memory.readptr(self.memory.base + fakedmoffset)
 
         dmoffset = self.memory.get_offset("FakeDataModelToDataModel")
+        dmaddr = self.memory.readptr(fakedmaddr + dmoffset)
 
-        return DataModel(self.memory, self.memory.readptr(fakedmaddr + dmoffset))
+        if dmaddr == 0:
+            offset = self.memory.get_offset("RenderJobToDataModel")
+            dmaddr = self.memory.readptr(job + offset)
+
+        return DataModel(self.memory, dmaddr)
 
 class FastFlags():
     def __init__(self, memory):

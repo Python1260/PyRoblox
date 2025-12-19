@@ -90,8 +90,8 @@ class Main(Application):
         dtscroll.setWidget(dtwidget)
         rightlayout.addWidget(dtscroll)
 
-        self.refreshbutton = QPushButton("Refresh")
-        rightlayout.addWidget(self.refreshbutton)
+        self.instancerefreshbutton = QPushButton("Refresh ↻")
+        rightlayout.addWidget(self.instancerefreshbutton)
 
         vrscroll = QScrollArea(self)
         vrscroll.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-radius: 0px;")
@@ -106,6 +106,9 @@ class Main(Application):
 
         vrscroll.setWidget(vrwidget)
         rightlayout.addWidget(vrscroll)
+
+        self.variablerefreshbutton = QPushButton("Refresh ↻")
+        rightlayout.addWidget(self.variablerefreshbutton)
 
         self.tabslayout.addTab(rightwidget, "Instances")
 
@@ -275,11 +278,11 @@ class Main(Application):
     def init_hotkeys(self):
         if not self.registered:
             def history_up():
-                if len(self.execute_history) > 0:
+                if hasattr(self, "execute_history") and len(self.execute_history) > 0:
                     self.executebox.setText(self.execute_history[self.execute_history_current])
                     self.execute_history_current = min(self.execute_history_current + 1, len(self.execute_history) - 1)
             def history_down():
-                if len(self.execute_history) > 0:
+                if hasattr(self, "execute_history") and len(self.execute_history) > 0:
                     self.executebox.setText(self.execute_history[self.execute_history_current])
                     self.execute_history_current = max(self.execute_history_current - 1, 0)
             
@@ -307,7 +310,8 @@ class Main(Application):
         try:
             self.searchbox.textChanged.disconnect()
             self.searchbox.returnPressed.disconnect()
-            self.refreshbutton.clicked.disconnect()
+            self.instancerefreshbutton.clicked.disconnect()
+            self.variablerefreshbutton.clicked.disconnect()
         except Exception:
             pass
         try:
@@ -503,14 +507,6 @@ class Main(Application):
 
         return main_widget
         
-    def updateVariable(self, mname, mwidget):
-        value = getattr(self.selected_instance, mname)()
-
-        mlayout = mwidget.layout()
-        mbutton = mlayout.itemAt(1).widget()
-
-        mbutton.setText(str(value))
-        
     def testSearch(self, text, obj):
         stext = text.lower().split(" ")
         cname = f"{obj.get_name().lower()} {obj.get_class().lower()} {obj.get_address()}"
@@ -600,6 +596,9 @@ class Main(Application):
 
             self.init_queue = []
             self.init_queue_insert(self.datamodel, self.dtframe, [self.players, self.workspace, self.replicatedstorage])
+        
+        def updateVariablesRefresh():
+            self.selectVariable(self.selected_instance)
         
         def updateEspDots():
             while self.enabled:
@@ -875,7 +874,7 @@ class Main(Application):
                                 if module:
                                     if module.set_bytecode(bytecode):
                                         self.injectstatus.setText("Sending require request...")
-
+                                        
                                         responses2 = await self.websocket.broadcast(action="requireModule", data=module.get_name(), target=ws)
 
                                         for _, data in responses2:
@@ -921,7 +920,8 @@ class Main(Application):
 
         self.searchbox.textChanged.connect(self.filterSearch)
         self.searchbox.returnPressed.connect(lambda : self.filterSearch(self.searchbox.text()))
-        self.refreshbutton.clicked.connect(updateInstancesRefresh)
+        self.instancerefreshbutton.clicked.connect(updateInstancesRefresh)
+        self.variablerefreshbutton.clicked.connect(updateVariablesRefresh)
 
         self.spdtextbox.returnPressed.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
         self.spdbutton.clicked.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
@@ -957,15 +957,6 @@ class Main(Application):
     
     def onStep(self):
         self.init_queue_update()
-
-        if self.selected_instance != None:
-            if not self.selected_instance.get_parent():
-                clearLayout(self.vrframe)
-                self.selected_instance = None
-                self.selected_variables = {}
-            else:
-                for methodname, varwidget in self.selected_variables.items():
-                    self.updateVariable(methodname, varwidget)
 
 if __name__ == '__main__':
     runner = QApplication(sys.argv)
