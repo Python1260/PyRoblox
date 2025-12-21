@@ -93,9 +93,9 @@ class Main(Application):
         self.instancerefreshbutton = QPushButton("Refresh ↻")
         rightlayout.addWidget(self.instancerefreshbutton)
 
-        vrscroll = QScrollArea(self)
-        vrscroll.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-radius: 0px;")
-        vrscroll.setWidgetResizable(True)
+        self.vrscroll = QScrollArea(self)
+        self.vrscroll.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-radius: 0px;")
+        self.vrscroll.setWidgetResizable(True)
 
         vrwidget = QWidget()
         vrwidget.setStyleSheet("background-color: #2d2d2d;")
@@ -104,8 +104,8 @@ class Main(Application):
         self.vrframe.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.vrframe.setSpacing(5)
 
-        vrscroll.setWidget(vrwidget)
-        rightlayout.addWidget(vrscroll)
+        self.vrscroll.setWidget(vrwidget)
+        rightlayout.addWidget(self.vrscroll)
 
         self.variablerefreshbutton = QPushButton("Refresh ↻")
         rightlayout.addWidget(self.variablerefreshbutton)
@@ -308,6 +308,7 @@ class Main(Application):
         clearLayout(self.dtframe)
 
         try:
+            self.searchbox.setText("")
             self.searchbox.textChanged.disconnect()
             self.searchbox.returnPressed.disconnect()
             self.instancerefreshbutton.clicked.disconnect()
@@ -453,6 +454,9 @@ class Main(Application):
     def selectVariable(self, obj):
         self.selected_instance = obj
 
+        if obj in self.instance_buttons:
+            self.vrscroll.ensureWidgetVisible(self.instance_buttons[obj])
+
         objname = obj.get_name
         objclass = obj.get_class
         objaddress = obj.get_address
@@ -516,7 +520,7 @@ class Main(Application):
         pcount = parent.count()
 
         for c in range(pcount):
-            if (len(self.searches_current) and min(self.searches_current) == sid) > 1 or not self.enabled:
+            if (len(self.searches_current) > 1) or not self.enabled:
                 break
 
             childwidget = parent.itemAt(c).widget()
@@ -535,6 +539,9 @@ class Main(Application):
                 parented = False
 
                 while cur and cur in self.instance_buttons_rev and (not cur in self.searches_closedbuttons) and (not sip.isdeleted(cur)):
+                    if (len(self.searches_current) > 1) or not self.enabled:
+                        break
+
                     curlayout = cur.layout()
                     curinfo = curlayout.itemAt(0).widget()
                     curinfolayout = curinfo.layout()
@@ -562,6 +569,8 @@ class Main(Application):
             searchid = time.perf_counter_ns()
             self.searches_current.append(searchid)
             self.searches_closedbuttons = []
+
+            while len(self.searches_current) > 1: pass
 
             self.findSearch(self.dtframe, text, [], sid=searchid)
 
@@ -814,9 +823,13 @@ class Main(Application):
             compiler = Compiler()
 
             async def inject():
+                success = False
+
                 robloxreplicatedstorage = self.datamodel.get_service("RobloxReplicatedStorage")
 
                 if not robloxreplicatedstorage.find_first_child(self.name):
+                    self.injectstatus.setText("Compiling hook...")
+
                     hook = compiler.get_hook(self.name, self.version, self.memory.process.process_id)
                     script = "script.Parent=nil;task.spawn(function()" + hook + "\nend);while true do task.wait(9e9) end"
 
@@ -826,69 +839,87 @@ class Main(Application):
                         self.injectstatus.setText("Injecting hook...")
 
                         try:
-                            starterplayer = self.datamodel.get_service("StarterPlayer")
                             scriptcontext = self.datamodel.get_service("ScriptContext")
+                            starterplayer = self.datamodel.get_service("StarterPlayer")
                             coregui = self.datamodel.get_service("CoreGui")
 
-                            vrnavigation = starterplayer.find_first_child("StarterPlayerScripts").find_first_child("PlayerModule").find_first_child("ControlModule").find_first_child("VRNavigation")
-                            playerlistmanager = coregui.find_first_child("RobloxGui").find_first_child("Modules").find_first_child("PlayerList").find_first_child("PlayerListManager")
+                            sourcescript = starterplayer.find_first_child("StarterPlayerScripts").find_first_child("PlayerModule").find_first_child("ControlModule").find_first_child("VRNavigation")
+                            spoofscript = coregui.find_first_child("RobloxGui").find_first_child("Modules").find_first_child("PlayerList").find_first_child("PlayerListManager")
+
+                            if not sourcescript:
+                                sourcescript = coregui.find_first_child("RobloxGui").find_first_child("Modules").find_first_child("FTUX").find_first_child("Events").find_first_child("VR").find_first_child("HapticFeedbackTwiceEvent")
 
                             self.memory.fastflags.set_fflag("WebSocketServiceEnableClientCreation", True)
 
-                            if scriptcontext.requirebypass():
-                                if vrnavigation.set_bytecode(bytecode):
-                                    playerlistmanager.spoofwith(vrnavigation)
-                                    time.sleep(0.5)
-                                    focus_until(self.memory.process.process_id, lambda : send_keys(VK_ESCAPE, VK_ESCAPE))
-                                    time.sleep(0.5)
-                                    playerlistmanager.spoofwith(playerlistmanager)
+                            if sourcescript and spoofscript:
+                                if scriptcontext.requirebypass():
+                                    if sourcescript.unlockmodule():
+                                        if sourcescript.set_bytecode(bytecode):
+                                            spoofscript.spoofwith(sourcescript)
+                                            time.sleep(0.5)
+                                            focus_until(self.memory.process.process_id, lambda : send_keys(VK_ESCAPE, VK_ESCAPE))
+                                            time.sleep(0.5)
+                                            spoofscript.spoofwith(spoofscript)
 
-                                    self.injectstatus.setText("Successfully injected hook into target script!")
+                                            self.injectstatus.setText("Successfully injected hook into spoofed script!")
+                                            success = True
+                                        else:
+                                            self.injectstatus.setText("Failed to set bytecode of spoofed script!")
+                                    else:
+                                        self.injectstatus.setText("Failed to unlock module of spoofed script!")
                                 else:
-                                    self.injectstatus.setText("Failed to set bytecode of target script!")
+                                    self.injectstatus.setText("Failed to require bypass!")
                             else:
-                                self.injectstatus.setText("Failed to require bypass!")
+                                self.injectstatus.setText("Source/Spoof script not found!")
                         except Exception:
-                            self.injectstatus.setText("Failed to inject hook into target script!")
+                            self.injectstatus.setText("Failed to inject hook into spoof script!")
                     else:
                         self.injectstatus.setText("Failed to compile hook!")
-                
-                self.injectstatus.setText("Connecting to hook...")
-
-                responses = await self.websocket.broadcast(action="getModule")
-
-                if len(responses) == 0:
-                    self.injectstatus.setText("Failed connecting to hook!")
                 else:
-                    script = "script.Parent=nil;task.spawn(function()" + luau + "\nend);return {}"
+                    success = True
+                
+                if success:
+                    self.injectstatus.setText("Connecting to hook...")
 
-                    status, bytecode = compiler.compile(script)
+                    responses = await self.websocket.broadcast(action="getModule")
 
-                    if status:
-                        self.injectstatus.setText("Injecting...")
-
-                        for ws, data in responses:
-                            try:
-                                module = robloxreplicatedstorage.find_first_child(self.name).find_first_child("Scripts").find_first_child(data)
-
-                                if module:
-                                    if module.set_bytecode(bytecode):
-                                        self.injectstatus.setText("Sending require request...")
-                                        
-                                        responses2 = await self.websocket.broadcast(action="requireModule", data=module.get_name(), target=ws)
-
-                                        for _, data in responses2:
-                                            pass
-                                                
-                                        self.injectstatus.setText("Successfully injected luau into target script!")
-                                    else:
-                                        self.injectstatus.setText("Failed to set bytecode of target script!")
-                                else:
-                                    self.injectstatus.setText("Target script not found!")
-                            except Exception:
-                                self.injectstatus.setText("Failed to inject luau into target script!")
+                    if len(responses) == 0:
+                        self.injectstatus.setText("Failed connecting to hook!")
                     else:
-                        self.injectstatus.setText("Failed to compile luau!")
+                        self.injectstatus.setText("Compiling luau...")
+
+                        script = "script.Parent=nil;task.spawn(function()" + luau + "\nend);return {}"
+
+                        status, bytecode = compiler.compile(script)
+
+                        if status:
+                            self.injectstatus.setText("Injecting...")
+
+                            for ws, data in responses:
+                                try:
+                                    module = robloxreplicatedstorage.find_first_child(self.name).find_first_child("Scripts").find_first_child(data)
+
+                                    if module:
+                                        if module.unlockmodule():
+                                            if module.set_bytecode(bytecode):
+                                                self.injectstatus.setText("Sending require request...")
+                                                
+                                                responses2 = await self.websocket.broadcast(action="requireModule", data=module.get_name(), target=ws)
+
+                                                for _, data in responses2:
+                                                    pass
+                                                        
+                                                self.injectstatus.setText("Successfully injected luau into target script!")
+                                            else:
+                                                self.injectstatus.setText("Failed to set bytecode of target script!")
+                                        else:
+                                            self.injectstatus.setText("Failed to unlock module of target script!")
+                                    else:
+                                        self.injectstatus.setText("Target script not found!")
+                                except Exception:
+                                    self.injectstatus.setText("Failed to inject luau into target script!")
+                        else:
+                            self.injectstatus.setText("Failed to compile luau!")
                 
                 self.injecting = False
             
@@ -897,7 +928,6 @@ class Main(Application):
 
             self.injecting = True
             threading.Thread(target=run_inject, daemon=True).start()
-            self.injectstatus.setText("Compiling...")
         
         def executeCode(text):
             if text == "": return
