@@ -33,6 +33,7 @@ I want to give **HUGE** credit to the following repositories that helped me a lo
 - https://github.com/RajkoRSL/python-external-roblox
 - https://github.com/ElCapor/bloxlib
 - https://github.com/justDarian/hyperinjector
+- https://github.com/Mitutoyum/roblox-external-executor
 
 *Also shoutout to https://github.com/NtReadVirtualMemory for roblox's memory offsets*
 
