@@ -3,8 +3,6 @@ from PyQt5.QtCore import QTimer, Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QPainter, QPen, QIntValidator
 import sip
 
-import time
-
 from classes import BasePart
 
 def clearLayout(layout):

@@ -1,5 +1,6 @@
 import os
 import sys
+import requests
 
 PACKAGES = [
     "pymem==1.13.0",
@@ -27,6 +28,7 @@ from datatypes import *
 from Luau.compiler import Compiler
 from Luau.input import focus_until, send_keys, VK_ESCAPE
 from Luau.websocket import WebSocket, asyncio
+from Luau.teleport_handler import TeleportHandler
 
 class Main(Application):
     def __init__(self):
@@ -52,8 +54,177 @@ class Main(Application):
         self.searches_current = []
         self.searches_closedbuttons = []
 
-        self.websocket = WebSocket()
+        self.compiler = Compiler()
+
         self.injecting = False
+        self.inject_host = "localhost"
+        self.inject_port = "8080"
+
+        async def ws_loadstring(client, id, data):
+            data_source = data["Source"]
+            data_module = data["Module"]
+
+            robloxreplicatedstorage = self.datamodel.get_service("RobloxReplicatedStorage")
+
+            script = "return function()" + data_source + "\nend"
+
+            status, bytecode = self.compiler.compile(script)
+
+            if status:
+                try:
+                    module = robloxreplicatedstorage.find_first_child(self.name).find_first_child("Scripts").find_first_child(data_module)
+
+                    if module:
+                        if module.unlockmodule():
+                            if module.set_bytecode(bytecode):
+                                await self.websocket.send(action="success", request_id=id, target=client)
+                                return
+                except Exception:
+                    pass
+
+            await self.websocket.send(action="error", request_id=id, target=client)
+        
+        async def ws_httpget(client, id, data):
+            data_url = data["Url"]
+
+            try:
+                request = requests.get(data_url)
+
+                if request and request.status_code == 200 and request.content:
+                    await self.websocket.send(action="success", data=request.text, request_id=id, target=client)
+                    return
+            except Exception:
+                pass
+
+            await self.websocket.send(action="error", request_id=id, target=client)
+        
+        async def ws_httprequest(client, id , data):
+            data_method = data["Method"]
+            data_url = data["Url"]
+
+            data_kwargs = {}
+            if "Headers" in data: data_kwargs["headers"] = data["Headers"]
+            if "Body" in data: data_kwargs["data"] = data["Body"] 
+            if "Cookies" in data: data_kwargs["cookies"] = data["Cookies"]
+            
+            try:
+                request = requests.request(data_method, data_url, **data_kwargs)
+
+                if request and request.status_code == 200 and request.content:
+                    await self.websocket.send(action="success", data={ "Body": request.text}, request_id=id, target=client)
+                    return
+            except Exception:
+                pass
+
+            await self.websocket.send(action="error", request_id=id, target=client)
+        
+        async def ws_getscriptbytecode(client, id, data):
+            data_pointer = data["Pointer"]
+
+            robloxreplicatedstorage = self.datamodel.get_service("RobloxReplicatedStorage")
+
+            try:
+                pointer = robloxreplicatedstorage.find_first_child(self.name).find_first_child("Objects").find_first_child(data_pointer)
+                script = pointer.get_value()
+
+                await self.websocket.send(action="success", data=str(script.get_bytecode()), request_id=id, target=client)
+                return
+            except Exception:
+                pass
+
+            await self.websocket.send(action="error", request_id=id, target=client)
+        
+        async def ws_queueonteleport(client, id, data):
+            data_source = data["Source"]
+
+            async def event():
+                success = False
+
+                robloxreplicatedstorage = self.datamodel.get_service("RobloxReplicatedStorage")
+
+                if not robloxreplicatedstorage.find_first_child(self.name):
+                    hook = self.compiler.get_hook(self.name, self.version, self.memory.process.process_id, self.inject_host, self.inject_port)
+                    script = "script.Parent=nil;task.spawn(function()" + hook + "\nend);while true do task.wait(9e9) end"
+
+                    status, bytecode = self.compiler.compile(script)
+
+                    if status:
+                        try:
+                            scriptcontext = self.datamodel.get_service("ScriptContext")
+                            starterplayer = self.datamodel.get_service("StarterPlayer")
+                            coregui = self.datamodel.get_service("CoreGui")
+                            
+                            if self.datamodel.get_name() == "LuaApp":
+                                pass
+                            else:
+                                sourcescript = starterplayer.find_first_child("StarterPlayerScripts").find_first_child("PlayerModule").find_first_child("ControlModule").find_first_child("VRNavigation")
+                                spoofscript = coregui.find_first_child("RobloxGui").find_first_child("Modules").find_first_child("PlayerList").find_first_child("PlayerListManager")
+
+                                if not sourcescript:
+                                    sourcescript = coregui.find_first_child("RobloxGui").find_first_child("Modules").find_first_child("FTUX").find_first_child("Events").find_first_child("VR").find_first_child("HapticFeedbackTwiceEvent")
+
+                                self.memory.fastflags.set_fflag("WebSocketServiceEnableClientCreation", True)
+
+                                if sourcescript and spoofscript:
+                                    if scriptcontext.requirebypass():
+                                        if sourcescript.unlockmodule():
+                                            if sourcescript.set_bytecode(bytecode):
+                                                spoofscript.spoofwith(sourcescript)
+                                                time.sleep(0.5)
+                                                focus_until(self.memory.process.process_id, lambda : send_keys(VK_ESCAPE, VK_ESCAPE))
+                                                time.sleep(0.5)
+                                                sourcescript.revertoriginal()
+                                                spoofscript.spoofwith(spoofscript)
+
+                                                handshake = await self.websocket.send_and_receive(action="handshake")
+
+                                                success = True
+                        except Exception:
+                            pass
+                    else:
+                        pass
+                else:
+                    success = True
+                
+                if success:
+                    responses = await self.websocket.send_and_receive(action="getModule")
+
+                    if len(responses) == 0:
+                        pass
+                    else:
+                        script = "return function()" + data_source + "\nend"
+
+                        status, bytecode = self.compiler.compile(script)
+
+                        if status:
+                            for ws, data in responses:
+                                try:
+                                    module = robloxreplicatedstorage.find_first_child(self.name).find_first_child("Scripts").find_first_child(data)
+
+                                    if module:
+                                        if module.unlockmodule():
+                                            if module.set_bytecode(bytecode):
+                                                responses2 = await self.websocket.send_and_receive(action="requireModule", data=module.get_name(), target=ws)
+                                except Exception:
+                                    pass
+                        else:
+                            pass
+            
+            def run_event():
+                asyncio.run(event())
+
+            self.teleport_handler.add_event(run_event)
+
+            await self.websocket.send(action="success", request_id=id, target=client)
+
+        self.websocket = WebSocket(self, host=self.inject_host, port=self.inject_port)
+        self.websocket.on("loadstring", ws_loadstring)
+        self.websocket.on("httpget", ws_httpget)
+        self.websocket.on("httprequest", ws_httprequest)
+        self.websocket.on("getscriptbytecode", ws_getscriptbytecode)
+        self.websocket.on("queueonteleport", ws_queueonteleport)
+
+        self.teleport_handler = TeleportHandler(self)
 
         self.execute_globals = { "game": self.datamodel, "Vector3": Vector3, "Vector2": Vector2, "CFrame": CFrame }
         self.execute_locals = {}
@@ -129,6 +300,21 @@ class Main(Application):
         self.flybox = QCheckBox("Enable FLY")
         flylayout.addWidget(self.flybox)
         downlayout.addWidget(flywidget)
+
+        healthlayout = QHBoxLayout()
+        healthwidget = QWidget()
+        healthwidget.setLayout(healthlayout)
+        healthlabel = QLabel("Player Health: ")
+        self.healthtextbox = QLineEdit("100")
+        self.healthtextbox.setValidator(QIntValidator(bottom=0))
+        self.healthtextbox.setPlaceholderText("Input value here")
+        self.healthtextbox.setStyleSheet("color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px;")
+        self.healthbutton = QPushButton("Ok")
+        self.healthbutton.setStyleSheet("QPushButton { color: #ffffff; background-color: #00bfff; border-color: #00bfff; border-radius: 3px; } QPushButton:hover { background-color: #66d9ff; } QPushButton:pressed { background-color: #00a6e6; }")
+        healthlayout.addWidget(healthlabel)
+        healthlayout.addWidget(self.healthtextbox)
+        healthlayout.addWidget(self.healthbutton)
+        downlayout.addWidget(healthwidget)
 
         spdlayout = QHBoxLayout()
         spdwidget = QWidget()
@@ -230,6 +416,10 @@ class Main(Application):
         self.injectbox = QTextEdit()
         self.injectbox.setPlaceholderText("Luau to inject...")
         self.injectbox.setStyleSheet("QTextEdit { font-family: Consolas, 'JetBrains Mono', monospace; color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px; }")
+        self.injectbox.setAcceptRichText(False)
+        self.injectbox.setLineWrapMode(QTextEdit.NoWrap)
+        self.injectbox.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.injectbox.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.injectcopybutton = QPushButton("Load from file")
         
         injectrow.addWidget(self.injectbox)
@@ -270,6 +460,7 @@ class Main(Application):
         self.executeresult.setReadOnly(True)
         self.executeresult.setStyleSheet("QTextEdit { font-family: Consolas, 'JetBrains Mono', monospace; color: #b0b0b0; background-color: #2d2d2d; border-color: #b0b0b0; border-radius: 3px; }")
         self.executeresult.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.executeresult.setAcceptRichText(False)
 
         toplayout.addWidget(self.executeresult)
 
@@ -292,14 +483,15 @@ class Main(Application):
             super().init_hotkeys()
     
     def closeEvent(self, event):
-        self.websocket.stop()
+        if self.websocket and self.websocket.running:
+            self.websocket.stop()
+        if self.teleport_handler and self.teleport_handler.running:
+            self.teleport_handler.stop()
 
         super().closeEvent(event)
     
     def enable_worker(self):
         super().enable_worker()
-
-        self.websocket.start()
 
     def disable_worker(self):
         super().disable_worker()
@@ -316,6 +508,8 @@ class Main(Application):
         except Exception:
             pass
         try:
+            self.healthtextbox.returnPressed.disconnect()
+            self.healthbutton.clicked.disconnect()
             self.spdtextbox.returnPressed.disconnect()
             self.spdbutton.clicked.disconnect()
             self.jumptextbox.returnPressed.disconnect()
@@ -343,7 +537,10 @@ class Main(Application):
         except Exception:
             pass
     
-        self.websocket.stop()
+        if self.websocket and self.websocket.running:
+            self.websocket.stop()
+        if self.teleport_handler and self.teleport_handler.running:
+            self.teleport_handler.stop()
     
     def init_queue_insert(self, obj, parent, strictchildren=None, parentinstance=None, parentname=""):
         self.init_queue.append({
@@ -361,10 +558,12 @@ class Main(Application):
     def init_queue_update(self):
         if len(self.init_queue) > 0:
             elem = self.init_queue.pop()
-            self.loadButton(**elem["args"])
 
-            if elem["parent"]["instance"]:
-                elem["parent"]["instance"].setText(elem["parent"]["name"])
+            if elem["args"]["obj"]:
+                self.loadButton(**elem["args"])
+
+                if elem["parent"]["instance"]:
+                    elem["parent"]["instance"].setText(elem["parent"]["name"])
 
     def loadButton(self, obj, parent, strictchildren=None):
         objname = obj.get_name()
@@ -516,10 +715,8 @@ class Main(Application):
         cname = f"{obj.get_name().lower()} {obj.get_class().lower()} {obj.get_address()}"
         return text == "" or any([part in cname for part in stext])
         
-    def findSearch(self, parent, text, current=[], sid= -1):
-        pcount = parent.count()
-
-        for c in range(pcount):
+    def findSearch(self, parent, text, current, sid= -1):
+        for c in range(parent.count()):
             if (len(self.searches_current) > 1) or not self.enabled:
                 break
 
@@ -578,7 +775,26 @@ class Main(Application):
             
         threading.Thread(target=search).start()
     
+    def refreshInstances(self):
+        self.init_queue = []
+
+        clearLayout(self.vrframe)
+        clearLayout(self.dtframe)
+
+        self.selected_instance = None
+        self.selected_variables = {}
+
+        self.init_queue_insert(self.datamodel, self.dtframe, [self.players, self.workspace, self.replicatedstorage])
+        
+    def refreshVariables(self):
+        self.selectVariable(self.selected_instance)
+    
     def onInit(self):
+        if self.websocket and not self.websocket.running:
+            self.websocket.start()
+        if self.teleport_handler and not self.teleport_handler.running:
+            self.teleport_handler.start()
+
         self.instance_buttons = {}
         self.instance_buttons_rev = {}
 
@@ -595,19 +811,6 @@ class Main(Application):
 
         self.execute_history = []
         self.execute_history_current = 0
-
-        def updateInstancesRefresh():
-            clearLayout(self.vrframe)
-            clearLayout(self.dtframe)
-
-            self.selected_instance = None
-            self.selected_variables = {}
-
-            self.init_queue = []
-            self.init_queue_insert(self.datamodel, self.dtframe, [self.players, self.workspace, self.replicatedstorage])
-        
-        def updateVariablesRefresh():
-            self.selectVariable(self.selected_instance)
         
         def updateEspDots():
             while self.enabled:
@@ -659,6 +862,23 @@ class Main(Application):
                         pass
                     
                 time.sleep(1 / self.fps)
+            
+        def updateHealthHealth(text):
+            if text == "": return
+
+            try:
+                localplayer = self.players.get_localplayer()
+                if not localplayer: return
+                character = localplayer.get_character()
+                if not character: return
+                humanoid = character.find_first_child("Humanoid")
+                if not humanoid: return
+
+                humanoid.set_health(float(text))
+                if float(text) > humanoid.get_maxhealth():
+                    humanoid.set_maxhealth(float(text))
+            except:
+                pass
         
         def updateSpdWalkSpeed(text):
             if text == "": return
@@ -811,16 +1031,14 @@ class Main(Application):
 
             if file:
                 try:
-                    with open(file) as f:
-                        self.injectbox.setText(f.read())
+                    with open(file, encoding="utf-8") as f:
+                        self.injectbox.setPlainText(f.read())
                 except Exception as e:
                     self.filechoose.setText("Please choose a valid .lua file!")
 
         def injectLuau(luau):
             if self.injecting: return
             if luau == "": return
-
-            compiler = Compiler()
 
             async def inject():
                 success = False
@@ -830,10 +1048,10 @@ class Main(Application):
                 if not robloxreplicatedstorage.find_first_child(self.name):
                     self.injectstatus.setText("Compiling hook...")
 
-                    hook = compiler.get_hook(self.name, self.version, self.memory.process.process_id)
+                    hook = self.compiler.get_hook(self.name, self.version, self.memory.process.process_id, self.inject_host, self.inject_port)
                     script = "script.Parent=nil;task.spawn(function()" + hook + "\nend);while true do task.wait(9e9) end"
 
-                    status, bytecode = compiler.compile(script)
+                    status, bytecode = self.compiler.compile(script)
 
                     if status:
                         self.injectstatus.setText("Injecting hook...")
@@ -842,35 +1060,42 @@ class Main(Application):
                             scriptcontext = self.datamodel.get_service("ScriptContext")
                             starterplayer = self.datamodel.get_service("StarterPlayer")
                             coregui = self.datamodel.get_service("CoreGui")
-
-                            sourcescript = starterplayer.find_first_child("StarterPlayerScripts").find_first_child("PlayerModule").find_first_child("ControlModule").find_first_child("VRNavigation")
-                            spoofscript = coregui.find_first_child("RobloxGui").find_first_child("Modules").find_first_child("PlayerList").find_first_child("PlayerListManager")
-
-                            if not sourcescript:
-                                sourcescript = coregui.find_first_child("RobloxGui").find_first_child("Modules").find_first_child("FTUX").find_first_child("Events").find_first_child("VR").find_first_child("HapticFeedbackTwiceEvent")
-
-                            self.memory.fastflags.set_fflag("WebSocketServiceEnableClientCreation", True)
-
-                            if sourcescript and spoofscript:
-                                if scriptcontext.requirebypass():
-                                    if sourcescript.unlockmodule():
-                                        if sourcescript.set_bytecode(bytecode):
-                                            spoofscript.spoofwith(sourcescript)
-                                            time.sleep(0.5)
-                                            focus_until(self.memory.process.process_id, lambda : send_keys(VK_ESCAPE, VK_ESCAPE))
-                                            time.sleep(0.5)
-                                            spoofscript.spoofwith(spoofscript)
-
-                                            self.injectstatus.setText("Successfully injected hook into spoofed script!")
-                                            success = True
-                                        else:
-                                            self.injectstatus.setText("Failed to set bytecode of spoofed script!")
-                                    else:
-                                        self.injectstatus.setText("Failed to unlock module of spoofed script!")
-                                else:
-                                    self.injectstatus.setText("Failed to require bypass!")
+                            
+                            if self.datamodel.get_name() == "LuaApp":
+                                self.injectstatus.setText("Cannot inject scripts in the roblox menu!")
                             else:
-                                self.injectstatus.setText("Source/Spoof script not found!")
+                                sourcescript = starterplayer.find_first_child("StarterPlayerScripts").find_first_child("PlayerModule").find_first_child("ControlModule").find_first_child("VRNavigation")
+                                spoofscript = coregui.find_first_child("RobloxGui").find_first_child("Modules").find_first_child("PlayerList").find_first_child("PlayerListManager")
+
+                                if not sourcescript:
+                                    sourcescript = coregui.find_first_child("RobloxGui").find_first_child("Modules").find_first_child("FTUX").find_first_child("Events").find_first_child("VR").find_first_child("HapticFeedbackTwiceEvent")
+
+                                self.memory.fastflags.set_fflag("WebSocketServiceEnableClientCreation", True)
+
+                                if sourcescript and spoofscript:
+                                    if scriptcontext.requirebypass():
+                                        if sourcescript.unlockmodule():
+                                            if sourcescript.set_bytecode(bytecode):
+                                                spoofscript.spoofwith(sourcescript)
+                                                time.sleep(0.5)
+                                                focus_until(self.memory.process.process_id, lambda : send_keys(VK_ESCAPE, VK_ESCAPE))
+                                                time.sleep(0.5)
+                                                sourcescript.revertoriginal()
+                                                spoofscript.spoofwith(spoofscript)
+
+                                                self.injectstatus.setText("Waiting for hook to respond...")
+                                                handshake = await self.websocket.send_and_receive(action="handshake")
+
+                                                self.injectstatus.setText("Successfully injected hook into spoofed script!")
+                                                success = True
+                                            else:
+                                                self.injectstatus.setText("Failed to set bytecode of spoofed script!")
+                                        else:
+                                            self.injectstatus.setText("Failed to unlock module of spoofed script!")
+                                    else:
+                                        self.injectstatus.setText("Failed to require bypass!")
+                                else:
+                                    self.injectstatus.setText("Source/Spoof script not found!")
                         except Exception:
                             self.injectstatus.setText("Failed to inject hook into spoof script!")
                     else:
@@ -881,16 +1106,16 @@ class Main(Application):
                 if success:
                     self.injectstatus.setText("Connecting to hook...")
 
-                    responses = await self.websocket.broadcast(action="getModule")
+                    responses = await self.websocket.send_and_receive(action="getModule")
 
                     if len(responses) == 0:
                         self.injectstatus.setText("Failed connecting to hook!")
                     else:
                         self.injectstatus.setText("Compiling luau...")
 
-                        script = "script.Parent=nil;task.spawn(function()" + luau + "\nend);return {}"
+                        script = "return function()" + luau + "\nend"
 
-                        status, bytecode = compiler.compile(script)
+                        status, bytecode = self.compiler.compile(script)
 
                         if status:
                             self.injectstatus.setText("Injecting...")
@@ -904,10 +1129,7 @@ class Main(Application):
                                             if module.set_bytecode(bytecode):
                                                 self.injectstatus.setText("Sending require request...")
                                                 
-                                                responses2 = await self.websocket.broadcast(action="requireModule", data=module.get_name(), target=ws)
-
-                                                for _, data in responses2:
-                                                    pass
+                                                responses2 = await self.websocket.send_and_receive(action="requireModule", data=module.get_name(), target=ws)
                                                         
                                                 self.injectstatus.setText("Successfully injected luau into target script!")
                                             else:
@@ -950,9 +1172,11 @@ class Main(Application):
 
         self.searchbox.textChanged.connect(self.filterSearch)
         self.searchbox.returnPressed.connect(lambda : self.filterSearch(self.searchbox.text()))
-        self.instancerefreshbutton.clicked.connect(updateInstancesRefresh)
-        self.variablerefreshbutton.clicked.connect(updateVariablesRefresh)
+        self.instancerefreshbutton.clicked.connect(self.refreshInstances)
+        self.variablerefreshbutton.clicked.connect(self.refreshVariables)
 
+        self.healthtextbox.returnPressed.connect(lambda : updateHealthHealth(self.healthtextbox.text()))
+        self.healthbutton.clicked.connect(lambda : updateHealthHealth(self.healthtextbox.text()))
         self.spdtextbox.returnPressed.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
         self.spdbutton.clicked.connect(lambda : updateSpdWalkSpeed(self.spdtextbox.text()))
         self.jumptextbox.returnPressed.connect(lambda : updateJumpJumpPower(self.jumptextbox.text()))

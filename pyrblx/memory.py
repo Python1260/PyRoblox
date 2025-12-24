@@ -2,6 +2,7 @@ import os
 
 import pymem
 import pymem.process
+from pymem.ressources import structure
 from pymem.ressources.kernel32 import VirtualProtectEx
 
 import ctypes
@@ -77,8 +78,8 @@ class Memory():
             json.dump(data, file, indent=1)
 
     def load_offsets_default(self):
-        self.offsets["ModuleFlags"] = "0x17c"
-        self.offsets["IsCoreScript"] = "0x180"
+        self.offsets.setdefault("ModuleFlags", "0x17c")
+        self.offsets.setdefault("IsCoreScript", "0x180")
     
     def load_offsets(self, offsetsfile=None):
         global OFFSETS

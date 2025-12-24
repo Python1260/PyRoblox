@@ -6,17 +6,25 @@ import websockets
 import threading
 
 class WebSocket():
-    def __init__(self, host="localhost", port=8080):
+    def __init__(self, app, host="localhost", port=8080):
+        self.app = app
+
+        self.running = False
+
         self.host = host
         self.port = port
+
+        self.thread = None
+        self.loop = None
 
         self.server = None
         self.clients = set()
 
         self.requests = {}
+        self.signal_handlers = {}
 
-        self.thread = None
-        self.loop = None
+    def on(self, name, func):
+        self.signal_handlers.setdefault(name, []).append(func)
     
     async def handler(self, websocket):
         self.clients.add(websocket)
@@ -24,18 +32,29 @@ class WebSocket():
         try:
             async for message in websocket:
                 data = json.loads(message)
+                req_type = data["type"]
+                req_id = data["id"]
+                req_action = data["action"]
+                req_data = data["data"]
 
-                if data["type"] == "response":
-                    req_id = data["id"]
-
+                if req_type == "client":
                     if req_id in self.requests:
                         for fut in self.requests[req_id]:
                             if not fut.done():
                                 fut_loop = fut.get_loop()
                                 fut_loop.call_soon_threadsafe(
                                     fut.set_result,
-                                    (websocket, data["data"])
+                                     (websocket, req_data)
                                 )
+                    if req_action in self.signal_handlers:
+                        handlers = self.signal_handlers[req_action]
+
+                        for handler in handlers:
+                            if asyncio.iscoroutinefunction(handler):
+                                self.loop.create_task(handler(websocket, req_id, req_data))
+                            else:
+                                self.loop.call_soon_threadsafe(handler, websocket, req_id, req_data)
+                            
         except asyncio.CancelledError:
             pass
         except websockets.ConnectionClosed:
@@ -43,10 +62,26 @@ class WebSocket():
         finally:
             self.clients.discard(websocket)
     
-    async def broadcast(self, action, data=None, timeout=5, target=None):
+    async def send(self, action, data=None, request_id=None, target=None):
         if data is None: data = {}
+        if request_id is None: request_id = str(uuid.uuid4())
 
-        request_id = str(uuid.uuid4())
+        clients = set(self.clients) if target is None else { target }
+
+        message = json.dumps({
+            "type": "server",
+            "id": request_id,
+            "action": action,
+            "data": data
+        })
+
+        for client in clients:
+            await client.send(message)
+    
+    async def send_and_receive(self, action, data=None, request_id=None, timeout=5, target=None):
+        if data is None: data = {}
+        if request_id is None: request_id = str(uuid.uuid4())
+
         futures = []
 
         clients = set(self.clients) if target is None else { target }
@@ -57,7 +92,7 @@ class WebSocket():
             self.requests.setdefault(request_id, []).append(fut)
         
         message = json.dumps({
-            "type": "request",
+            "type": "server",
             "id": request_id,
             "action": action,
             "data": data
@@ -93,6 +128,8 @@ class WebSocket():
     def start(self):
         if self.thread and self.thread.is_alive():
             return
+        
+        self.running = True
         
         def worker():
             self.loop = asyncio.new_event_loop()
@@ -131,6 +168,8 @@ class WebSocket():
     def stop(self):
         if not self.loop or not self.loop.is_running():
             return
+        
+        self.running = False
 
         asyncio.run_coroutine_threadsafe(self.stop_async(), self.loop)
         

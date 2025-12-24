@@ -1,4 +1,3 @@
-from pymem.ressources import structure
 from PyQt5.QtWidgets import QApplication
 
 from datatypes import *
@@ -92,7 +91,7 @@ class TaskScheduler():
             offset = self.memory.get_offset("RenderJobToDataModel")
             dmaddr = self.memory.readptr(job + offset)
 
-        return DataModel(self.memory, dmaddr)
+        return Instance.new(self.memory, dmaddr)
 
 class FastFlags():
     def __init__(self, memory):
@@ -325,6 +324,8 @@ class DataModel(Instance):
     def __init__(self, memory, address):
         super().__init__(memory, address)
     
+    
+    
     def get_service(self, service):
         return self.find_first_child_of_class(service)
     
@@ -457,15 +458,7 @@ class Humanoid(Instance):
     def get_health(self):
         try:
             offset = self.memory.get_offset("Health")
-            one = self.memory.readptr(self.address + offset)
-            if not one:
-                return 0.0
-            two = self.memory.readptr(one)
-
-            conv = one ^ two if two else one
-            conv32 = conv & 0xFFFFFFFF
-
-            return self.memory.struct.unpack('<f', self.memory.struct.pack('<I', conv32))[0]
+            return self.memory.readfloat(self.address + offset)
         except Exception as e:
             return 0.0
     
@@ -474,43 +467,14 @@ class Humanoid(Instance):
             return False
         try:
             offset = self.memory.get_offset("Health")
-            addr = self.address + offset
-
-            one = self.memory.readptr(addr)
-            if not one:
-                return False
-            packed32 = self.memory.struct.unpack('<I', self.memory.struct.pack('<f', float(value)))[0]
-            two = 0
-
-            try:
-                two = self.memory.readptr(one)
-            except Exception:
-                two = 0
-            if two:
-                conv64 = (one ^ packed32) & 0xFFFFFFFFFFFFFFFF
-                data = self.memory.struct.pack('<Q', conv64)
-
-                return self.memory.writebytes(one, data)
-            else:
-                new_one = ((one & 0xFFFFFFFF00000000) | packed32) & 0xFFFFFFFFFFFFFFFF
-                data = self.memory.struct.pack('<Q', new_one)
-
-                return self.memory.writebytes(addr, data)
+            return self.memory.writefloat(self.address + offset, float(value))
         except Exception:
             return False
 
     def get_maxhealth(self):
         try:
-            offset = self.memory.get_offset("Health")
-            one = self.memory.readptr(self.address + offset)
-            if not one:
-                return 0.0
-            two = self.memory.readptr(one)
-
-            conv = one ^ two if two else one
-            conv32 = conv & 0xFFFFFFFF
-
-            return self.memory.struct.unpack('<f', self.memory.struct.pack('<I', conv32))[0]
+            offset = self.memory.get_offset("MaxHealth")
+            return self.memory.readfloat(self.address + offset)
         except Exception as e:
             return 0.0
     
@@ -519,19 +483,7 @@ class Humanoid(Instance):
             return False
         try:
             offset = self.memory.get_offset("MaxHealth")
-            addr = self.address + offset
-
-            one = self.memory.readptr(addr)
-            if not one:
-                return False
-            packed = self.memory.struct.unpack('<I', self.memory.struct.pack('<f', value))[0]
-
-            conv = one ^ packed
-            target = self.memory.readptr(addr)
-
-            if not target:
-                return False
-            return self.memory.writeptr(target, conv)
+            return self.memory.writefloat(self.address + offset, float(value))
         except Exception:
             return False
     
@@ -1046,6 +998,44 @@ class LocalScript(BaseScript):
         super().__init__(memory, address)
 
         self.worker = ScriptBytecode()
+
+        self.original_saved = False
+        self.original_pointer = 0
+        self.original_size = 0
+    
+    def saveoriginal(self):
+        try:
+            offset = self.memory.get_offset("LocalScriptByteCode")
+            boffset = self.memory.get_offset("LocalScriptBytecodePointer")
+
+            addr = self.memory.readptr(self.address + offset)
+
+            self.original_pointer = self.memory.readptr(addr + boffset)
+            self.original_size = self.memory.readint(addr + boffset + 0x10)
+            self.original_saved = True
+
+            return self.original_pointer and self.original_size
+        except Exception as e:
+            return False
+    
+    def revertoriginal(self):
+        if not self.original_saved: return
+        try:
+            offset = self.memory.get_offset("LocalScriptByteCode")
+            boffset = self.memory.get_offset("LocalScriptBytecodePointer")
+
+            success = True
+
+            addr = self.memory.readptr(self.address + offset)
+            daddr = self.memory.readptr(addr + boffset)
+            self.memory.free(daddr)
+
+            success = success and self.memory.writeptr(addr + boffset, self.original_pointer)
+            success = success and self.memory.writeint(addr + boffset + 0x10, self.original_size)
+
+            return success
+        except Exception as e:
+            return False
     
     def get_data(self):
         try:
@@ -1074,7 +1064,12 @@ class LocalScript(BaseScript):
             addr = self.memory.readptr(self.address + offset)
 
             daddr = self.memory.readptr(addr + boffset)
-            self.memory.free(daddr)
+
+            if not self.original_saved:
+                self.saveoriginal()
+            else:
+                self.memory.free(daddr)
+
             daddr = self.memory.allocate(dsize)
             self.memory.writebytes(daddr, bytecode)
 
@@ -1104,6 +1099,44 @@ class ModuleScript(BaseScript):
         super().__init__(memory, address)
 
         self.worker = ScriptBytecode()
+
+        self.original_saved = False
+        self.original_pointer = 0
+        self.original_size = 0
+    
+    def saveoriginal(self):
+        try:
+            offset = self.memory.get_offset("ModuleScriptByteCode")
+            boffset = self.memory.get_offset("ModuleScriptBytecodePointer")
+
+            addr = self.memory.readptr(self.address + offset)
+
+            self.original_pointer = self.memory.readptr(addr + boffset)
+            self.original_size = self.memory.readint(addr + boffset + 0x10)
+            self.original_saved = True
+
+            return self.original_pointer and self.original_size
+        except Exception as e:
+            return False
+    
+    def revertoriginal(self):
+        if not self.original_saved: return
+        try:
+            offset = self.memory.get_offset("ModuleScriptByteCode")
+            boffset = self.memory.get_offset("ModuleScriptBytecodePointer")
+
+            success = True
+
+            addr = self.memory.readptr(self.address + offset)
+            daddr = self.memory.readptr(addr + boffset)
+            self.memory.free(daddr)
+
+            success = success and self.memory.writeptr(addr + boffset, self.original_pointer)
+            success = success and self.memory.writeint(addr + boffset + 0x10, self.original_size)
+
+            return success
+        except Exception as e:
+            return False
     
     def get_data(self):
         try:
@@ -1132,7 +1165,12 @@ class ModuleScript(BaseScript):
             addr = self.memory.readptr(self.address + offset)
 
             daddr = self.memory.readptr(addr + boffset)
-            self.memory.free(daddr)
+
+            if not self.original_saved:
+                self.saveoriginal()
+            else:
+                self.memory.free(daddr)
+
             daddr = self.memory.allocate(dsize)
             self.memory.writebytes(daddr, bytecode)
 
@@ -1164,7 +1202,7 @@ class ModuleScript(BaseScript):
         success = True
 
         success = success and self.memory.writeptr(self.address + mfoffset, 0x100000000)
-        success = success and self.memory.writeptr(self.address + icsoffset, 0x1)
+        success = success and self.memory.writeptr(self.address + icsoffset, 0x2)
 
         return success
 
@@ -1277,6 +1315,7 @@ class TextLabel(Instance):
             return ""
     
 CLASSTYPES = {
+    "DataModel": DataModel,
     "ScriptContext": ScriptContext,
     "Workspace": Workspace,
     "Players": Players,

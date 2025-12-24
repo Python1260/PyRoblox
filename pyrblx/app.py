@@ -503,6 +503,7 @@ class Application(QWidget):
                 else:
                     self.onStep()
             except Exception as e:
+                raise e
                 self.disable()
         
     def onInit(self):

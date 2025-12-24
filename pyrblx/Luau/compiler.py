@@ -17,30 +17,38 @@ def rotl8(value, shift):
 class Compiler():
 	def __init__(self, path="Luau/luau-compile-roblox.exe"):
 		self.execname = path
-		self.tempname_write = "temp_write.lua"
+		self.tempname_write = "temp_write.bin"
 		self.tempname_read = "temp_read.bin"
 
-	def get_hook(self, name, version, pid, path="Luau/hooker.lua"):
+	def get_hook(self, name, version, pid, host, port, path="Luau/hooker.lua"):
 		with open(path) as file:
 			content = file.read()
 
-		return content.replace("%EXECUTOR_NAME%", name).replace("%EXECUTOR_VERSION%", str(version)).replace("%PROCESS_ID%", str(pid)) 
+		content = content.replace("%EXECUTOR_NAME%", name)
+		content = content.replace("%EXECUTOR_VERSION%", str(version))
+		content = content.replace("%PROCESS_ID%", str(pid))
+		content = content.replace("%WEBSOCKET_HOST%", host)
+		content = content.replace("%WEBSOCKET_PORT%", port)
+
+		return content
 
 	def compile(self, luau):
-		with open(self.tempname_write, "w") as file:
-			file.write(luau)
+		with open(self.tempname_write, "wb") as file:
+			file.write(luau.encode("utf-8"))
 
 		result = subprocess.run(
 			[self.execname, self.tempname_write, self.tempname_read]
 		)
 
-		remove(self.tempname_write)
+		try: remove(self.tempname_write)
+		except: pass
 		
 		if result.returncode == 0:
 			with open(self.tempname_read, "rb") as file:
 				bytecode = file.read()
 			
-			remove(self.tempname_read)
+			try: remove(self.tempname_read)
+			except: pass
 			
 			return True, self.sign(bytecode)
 
