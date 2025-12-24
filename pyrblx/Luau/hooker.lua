@@ -219,7 +219,7 @@ WebSocket:On("requireModule", function(id, data)
         local func = require(module)
 
         Utils:ForceEnvironment(func)
-        func()
+        task.spawn(func)
 
         module:Destroy()
 

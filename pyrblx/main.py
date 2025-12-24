@@ -144,7 +144,7 @@ class Main(Application):
 
                 if not robloxreplicatedstorage.find_first_child(self.name):
                     hook = self.compiler.get_hook(self.name, self.version, self.memory.process.process_id, self.inject_host, self.inject_port)
-                    script = "script.Parent=nil;task.spawn(function()" + hook + "\nend);while true do task.wait(9e9) end"
+                    script = "task.spawn(function()" + hook + "\nend);while true do task.wait(9e9) end"
 
                     status, bytecode = self.compiler.compile(script)
 
@@ -654,7 +654,10 @@ class Main(Application):
         self.selected_instance = obj
 
         if obj in self.instance_buttons:
-            self.vrscroll.ensureWidgetVisible(self.instance_buttons[obj])
+            button = self.instance_buttons[obj]
+
+            if not sip.isdeleted(button):
+                self.vrscroll.ensureWidgetVisible(self.instance_buttons[obj])
 
         objname = obj.get_name
         objclass = obj.get_class
@@ -781,8 +784,14 @@ class Main(Application):
         clearLayout(self.vrframe)
         clearLayout(self.dtframe)
 
+        self.instance_buttons = {}
+        self.instance_buttons_rev = {}
+
         self.selected_instance = None
         self.selected_variables = {}
+
+        self.searches_current = []
+        self.searches_closedbuttons = []
 
         self.init_queue_insert(self.datamodel, self.dtframe, [self.players, self.workspace, self.replicatedstorage])
         
@@ -1049,7 +1058,7 @@ class Main(Application):
                     self.injectstatus.setText("Compiling hook...")
 
                     hook = self.compiler.get_hook(self.name, self.version, self.memory.process.process_id, self.inject_host, self.inject_port)
-                    script = "script.Parent=nil;task.spawn(function()" + hook + "\nend);while true do task.wait(9e9) end"
+                    script = "task.spawn(function()" + hook + "\nend);while true do task.wait(9e9) end"
 
                     status, bytecode = self.compiler.compile(script)
 
