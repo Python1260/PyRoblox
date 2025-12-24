@@ -20,10 +20,10 @@
 ---
 
 ## Usage
-1) Start roblox and enter any roblox game
-2) Run the file "pyrblx/main.py"
-3) A window should appear and automatically install all the necessary requirements
-4) The actual application will now appear and attempt connection to the roblox process
+1) Start roblox and enter any roblox game.
+2) Run the file "pyrblx/main.py".
+3) A window should appear and automatically install all the necessary requirements.
+4) The actual application will now appear. Press "Start" to attempt connection to the roblox process.
 5) Once the status is green and reads "Connected", you should be able to explore this game's assets using the explorer in the "Instances" tab. Enjoy!
 
 ---
@@ -41,3 +41,4 @@ I want to give **HUGE** credit to the following repositories that helped me a lo
 ## NOTES
   - For now only Windows is supported, sorry!
   - THE SEARCH FEATURE IS VERY BUGGY PLS FORGIVE ME!!!!!!!!
+  - This is still in very early testing, so there may and WILL be errors.
