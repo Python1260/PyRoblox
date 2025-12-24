@@ -35,7 +35,7 @@ I want to give **HUGE** credit to the following repositories that helped me a lo
 - https://github.com/justDarian/hyperinjector
 - https://github.com/Mitutoyum/roblox-external-executor
 
-*Also shoutout to https://github.com/NtReadVirtualMemory for roblox's memory offsets*
+*Also shoutout to https://github.com/NtReadVirtualMemory for roblox's memory offsets and fast flags*
 
 ---
 
